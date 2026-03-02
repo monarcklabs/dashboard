@@ -61,7 +61,7 @@ function buildLayout(
 
   for (let level = 0; level < levels.length; level++) {
     const ids = levels[level]
-    const spacing = Math.max(160, Math.min(220, 1400 / Math.max(ids.length, 1)))
+    const spacing = Math.max(200, Math.min(260, 1600 / Math.max(ids.length, 1)))
     const totalWidth = ids.length * spacing
     const startX = 600 - totalWidth / 2 + spacing / 2
 

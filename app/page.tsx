@@ -258,30 +258,24 @@ export default function ManorPage() {
             className="h-full flex flex-col ml-auto"
             style={{
               width: "100%",
-              maxWidth: 360,
+              maxWidth: 380,
               flexShrink: 0,
               overflowY: "auto",
-              background: "var(--material-regular)",
-              backdropFilter: "var(--sidebar-backdrop)",
-              WebkitBackdropFilter: "var(--sidebar-backdrop)",
-              boxShadow: "-4px 0 24px rgba(0,0,0,0.25)",
+              background: "var(--bg)",
+              boxShadow: "var(--shadow-overlay)",
             }}
           >
-            {/* Color strip */}
+            {/* ── Toolbar row ── */}
             <div
               style={{
-                height: 3,
-                background: selected.color,
-                flexShrink: 0,
-              }}
-            />
-
-            {/* Close button */}
-            <div
-              style={{
-                padding: "var(--space-4) var(--space-5) 0",
+                position: "sticky",
+                top: 0,
+                zIndex: 10,
                 display: "flex",
+                alignItems: "center",
                 justifyContent: "flex-end",
+                padding: "var(--space-3) var(--space-4)",
+                background: "var(--bg)",
               }}
             >
               <button
@@ -290,17 +284,18 @@ export default function ManorPage() {
                 className="focus-ring"
                 aria-label="Close detail panel"
                 style={{
-                  width: 28,
-                  height: 28,
+                  width: 30,
+                  height: 30,
                   borderRadius: "50%",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  background: "var(--fill-secondary)",
+                  background: "var(--fill-tertiary)",
                   color: "var(--text-secondary)",
                   border: "none",
                   cursor: "pointer",
-                  fontSize: "var(--text-footnote)",
+                  fontSize: 13,
+                  fontWeight: "var(--weight-semibold)",
                   transition: "all 150ms var(--ease-spring)",
                 }}
               >
@@ -308,20 +303,30 @@ export default function ManorPage() {
               </button>
             </div>
 
-            {/* Header */}
-            <div style={{ padding: "var(--space-2) var(--space-6) var(--space-5)" }}>
-              {/* Emoji on squircle */}
+            {/* ── Hero header ── */}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                textAlign: "center",
+                padding: "0 var(--space-6) var(--space-6)",
+              }}
+            >
+              {/* Emoji avatar */}
               <div
                 style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: 14,
-                  background: `${selected.color}26`,
+                  width: 72,
+                  height: 72,
+                  borderRadius: 20,
+                  background: `${selected.color}22`,
+                  border: `1px solid ${selected.color}40`,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: 28,
+                  fontSize: 36,
                   marginBottom: "var(--space-3)",
+                  boxShadow: `0 4px 20px ${selected.color}18`,
                 }}
               >
                 {selected.emoji}
@@ -329,12 +334,12 @@ export default function ManorPage() {
 
               <h2
                 style={{
-                  fontSize: "var(--text-title1)",
+                  fontSize: "var(--text-title2)",
                   fontWeight: "var(--weight-bold)",
-                  letterSpacing: "-0.5px",
+                  letterSpacing: "var(--tracking-tight)",
                   color: "var(--text-primary)",
                   margin: 0,
-                  lineHeight: 1.2,
+                  lineHeight: "var(--leading-tight)",
                 }}
               >
                 {selected.name}
@@ -344,236 +349,399 @@ export default function ManorPage() {
                 style={{
                   fontSize: "var(--text-subheadline)",
                   fontWeight: "var(--weight-regular)",
-                  color: "var(--text-secondary)",
+                  color: selected.color,
                   margin: "2px 0 0",
+                  opacity: 0.85,
                 }}
               >
                 {selected.title}
               </p>
 
+              {selected.description && (
+                <p
+                  style={{
+                    fontSize: "var(--text-footnote)",
+                    lineHeight: "var(--leading-normal)",
+                    color: "var(--text-secondary)",
+                    margin: "var(--space-2) 0 0",
+                    maxWidth: 280,
+                  }}
+                >
+                  {selected.description}
+                </p>
+              )}
+
+              {/* Quick action buttons */}
               <div
                 style={{
-                  marginTop: "var(--space-3)",
-                  height: 1,
-                  background: "var(--separator)",
-                }}
-              />
-            </div>
-
-            {/* ABOUT */}
-            <div style={{ padding: "0 var(--space-6) var(--space-4)" }}>
-              <div className="section-header" style={{ marginBottom: "var(--space-2)" }}>
-                About
-              </div>
-              <p
-                style={{
-                  fontSize: "var(--text-footnote)",
-                  lineHeight: 1.6,
-                  color: "var(--text-secondary)",
-                  margin: 0,
+                  display: "flex",
+                  gap: "var(--space-2)",
+                  marginTop: "var(--space-4)",
+                  width: "100%",
+                  maxWidth: 280,
                 }}
               >
-                {selected.description}
-              </p>
+                <button
+                  onClick={() => router.push(`/chat/${selected.id}`)}
+                  className="focus-ring"
+                  aria-label={`Open chat with ${selected.name}`}
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "var(--space-2)",
+                    padding: "var(--space-2) var(--space-3)",
+                    borderRadius: "var(--radius-md)",
+                    background: "var(--accent)",
+                    color: "#000",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "var(--text-subheadline)",
+                    fontWeight: "var(--weight-semibold)",
+                    transition: "all 150ms var(--ease-spring)",
+                  }}
+                >
+                  Message
+                </button>
+                <Link
+                  href={`/agents/${selected.id}`}
+                  className="focus-ring"
+                  aria-label={`View full profile of ${selected.name}`}
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "var(--space-2)",
+                    padding: "var(--space-2) var(--space-3)",
+                    borderRadius: "var(--radius-md)",
+                    background: "var(--fill-tertiary)",
+                    color: "var(--text-primary)",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "var(--text-subheadline)",
+                    fontWeight: "var(--weight-semibold)",
+                    textDecoration: "none",
+                    transition: "all 150ms var(--ease-spring)",
+                  }}
+                >
+                  Profile
+                </Link>
+              </div>
             </div>
 
-            {/* TOOLS */}
-            <div style={{ padding: "0 var(--space-6) var(--space-4)" }}>
-              <div className="section-header" style={{ marginBottom: "var(--space-2)" }}>
-                Tools
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {selected.tools.map((t) => (
-                  <span
-                    key={t}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 4,
-                      background: "var(--fill-secondary)",
-                      borderRadius: 8,
-                      padding: "5px 10px",
-                      fontSize: "var(--text-caption1)",
-                      fontFamily: "var(--font-mono)",
-                      color: "var(--text-secondary)",
-                    }}
-                  >
-                    {TOOL_ICONS[t] && (
-                      <span style={{ fontSize: "var(--text-caption2)" }}>{TOOL_ICONS[t]}</span>
-                    )}
-                    {t}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* HIERARCHY */}
-            {(parentAgent || childAgents.length > 0) && (
-              <div style={{ padding: "0 var(--space-6) var(--space-4)" }}>
-                <div className="section-header" style={{ marginBottom: "var(--space-2)" }}>
-                  Hierarchy
-                </div>
-                {parentAgent && (
-                  <div style={{ marginBottom: "var(--space-2)" }}>
-                    <span
-                      style={{
-                        fontSize: "var(--text-caption2)",
-                        color: "var(--text-tertiary)",
-                      }}
-                    >
-                      Reports to
-                    </span>
-                    <button
-                      className="focus-ring"
-                      aria-label={`Select ${parentAgent.name}`}
-                      onClick={() => setSelected(parentAgent)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "var(--space-2)",
-                        marginTop: 2,
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        fontSize: "var(--text-body)",
-                        fontWeight: "var(--weight-medium)",
-                        color: "var(--system-blue)",
-                        padding: 0,
-                      }}
-                    >
-                      <span>{parentAgent.emoji}</span>
-                      <span>{parentAgent.name}</span>
-                      <span style={{ color: "var(--text-tertiary)" }}>&rarr;</span>
-                    </button>
-                  </div>
-                )}
-                {childAgents.length > 0 && (
-                  <div>
-                    <span
-                      style={{
-                        fontSize: "var(--text-caption2)",
-                        color: "var(--text-tertiary)",
-                      }}
-                    >
-                      Direct reports
-                    </span>
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 2,
-                        marginTop: 2,
-                      }}
-                    >
-                      {childAgents.map((c) => (
-                        <button
-                          key={c.id}
-                          className="focus-ring"
-                          aria-label={`Select ${c.name}`}
-                          onClick={() => setSelected(c)}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "var(--space-2)",
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            fontSize: "var(--text-body)",
-                            fontWeight: "var(--weight-medium)",
-                            color: "var(--system-blue)",
-                            padding: "2px 0",
-                          }}
-                        >
-                          <span>{c.emoji}</span>
-                          <span>{c.name}</span>
-                          <span style={{ color: "var(--text-tertiary)" }}>&rarr;</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* CRONS */}
-            {agentCrons.length > 0 && (
-              <div style={{ padding: "0 var(--space-6) var(--space-4)" }}>
-                <div className="section-header" style={{ marginBottom: "var(--space-2)" }}>
-                  Crons
+            {/* ── Grouped sections ── */}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--space-8)",
+                padding: "var(--space-2) var(--space-4) var(--space-8)",
+              }}
+            >
+              {/* TOOLS */}
+              <div>
+                <div
+                  style={{
+                    fontSize: "var(--text-caption1)",
+                    fontWeight: "var(--weight-semibold)",
+                    letterSpacing: "var(--tracking-wide)",
+                    textTransform: "uppercase",
+                    color: "var(--text-tertiary)",
+                    padding: "0 var(--space-4) var(--space-2)",
+                  }}
+                >
+                  Capabilities
                 </div>
                 <div
                   style={{
+                    background: "var(--material-regular)",
                     borderRadius: "var(--radius-md)",
+                    border: "1px solid var(--separator)",
                     overflow: "hidden",
                   }}
                 >
-                  {agentCrons.map((c, idx) => (
+                  {selected.tools.map((t, idx) => (
                     <div
-                      key={c.id}
+                      key={t}
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: "var(--space-2)",
-                        minHeight: 40,
-                        padding: "0 var(--space-3)",
-                        borderTop:
-                          idx > 0 ? "1px solid var(--separator)" : undefined,
+                        gap: "var(--space-3)",
+                        padding: "var(--space-3) var(--space-4)",
+                        borderTop: idx > 0 ? "1px solid var(--separator)" : undefined,
                       }}
                     >
-                      <StatusDot status={c.status} />
                       <span
                         style={{
-                          fontSize: "var(--text-body)",
-                          fontWeight: "var(--weight-medium)",
-                          color: "var(--text-primary)",
-                          flex: 1,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {c.name}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: "var(--text-caption1)",
-                          fontFamily: "var(--font-mono)",
-                          color: "var(--text-tertiary)",
+                          width: 28,
+                          height: 28,
+                          borderRadius: 7,
+                          background: "var(--fill-tertiary)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "var(--text-footnote)",
                           flexShrink: 0,
                         }}
                       >
-                        {c.schedule}
+                        {TOOL_ICONS[t] || "\u2699\uFE0F"}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: "var(--text-body)",
+                          color: "var(--text-primary)",
+                          flex: 1,
+                        }}
+                      >
+                        {t.replace(/_/g, " ")}
                       </span>
                     </div>
                   ))}
                 </div>
               </div>
-            )}
 
-            {/* CTAs -- pushed to bottom */}
-            <div
-              style={{
-                marginTop: "auto",
-                padding: "var(--space-5) var(--space-6)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "var(--space-2)",
-              }}
-            >
-              <button
-                onClick={() => router.push(`/chat/${selected.id}`)}
-                className="btn-primary focus-ring"
-                aria-label={`Open chat with ${selected.name}`}
-              >
-                Open Chat
-              </button>
-              <Link
-                href={`/agents/${selected.id}`}
-                className="btn-ghost focus-ring"
-                aria-label={`View full profile of ${selected.name}`}
-              >
-                View Profile
-              </Link>
+              {/* HIERARCHY */}
+              {(parentAgent || childAgents.length > 0) && (
+                <div>
+                  <div
+                    style={{
+                      fontSize: "var(--text-caption1)",
+                      fontWeight: "var(--weight-semibold)",
+                      letterSpacing: "var(--tracking-wide)",
+                      textTransform: "uppercase",
+                      color: "var(--text-tertiary)",
+                      padding: "0 var(--space-4) var(--space-2)",
+                    }}
+                  >
+                    Organization
+                  </div>
+                  <div
+                    style={{
+                      background: "var(--material-regular)",
+                      borderRadius: "var(--radius-md)",
+                      border: "1px solid var(--separator)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {parentAgent && (
+                      <button
+                        className="focus-ring"
+                        aria-label={`Select ${parentAgent.name}`}
+                        onClick={() => setSelected(parentAgent)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "var(--space-3)",
+                          padding: "var(--space-3) var(--space-4)",
+                          width: "100%",
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          textAlign: "left",
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 9,
+                            background: `${parentAgent.color}20`,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "var(--text-body)",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {parentAgent.emoji}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: "var(--text-body)",
+                              fontWeight: "var(--weight-medium)",
+                              color: "var(--text-primary)",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {parentAgent.name}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "var(--text-caption1)",
+                              color: "var(--text-tertiary)",
+                            }}
+                          >
+                            Reports to
+                          </div>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: "var(--text-body)",
+                            color: "var(--text-quaternary)",
+                            flexShrink: 0,
+                          }}
+                        >
+                          &#x203A;
+                        </span>
+                      </button>
+                    )}
+                    {childAgents.map((c, idx) => (
+                      <button
+                        key={c.id}
+                        className="focus-ring"
+                        aria-label={`Select ${c.name}`}
+                        onClick={() => setSelected(c)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "var(--space-3)",
+                          padding: "var(--space-3) var(--space-4)",
+                          width: "100%",
+                          background: "none",
+                          border: "none",
+                          borderTop: (parentAgent || idx > 0) ? "1px solid var(--separator)" : undefined,
+                          cursor: "pointer",
+                          textAlign: "left",
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 9,
+                            background: `${c.color}20`,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "var(--text-body)",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {c.emoji}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: "var(--text-body)",
+                              fontWeight: "var(--weight-medium)",
+                              color: "var(--text-primary)",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {c.name}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "var(--text-caption1)",
+                              color: "var(--text-tertiary)",
+                            }}
+                          >
+                            Direct report
+                          </div>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: "var(--text-body)",
+                            color: "var(--text-quaternary)",
+                            flexShrink: 0,
+                          }}
+                        >
+                          &#x203A;
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* CRONS */}
+              {agentCrons.length > 0 && (
+                <div>
+                  <div
+                    style={{
+                      fontSize: "var(--text-caption1)",
+                      fontWeight: "var(--weight-semibold)",
+                      letterSpacing: "var(--tracking-wide)",
+                      textTransform: "uppercase",
+                      color: "var(--text-tertiary)",
+                      padding: "0 var(--space-4) var(--space-2)",
+                    }}
+                  >
+                    Scheduled Tasks
+                  </div>
+                  <div
+                    style={{
+                      background: "var(--material-regular)",
+                      borderRadius: "var(--radius-md)",
+                      border: "1px solid var(--separator)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {agentCrons.map((c, idx) => (
+                      <div
+                        key={c.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "var(--space-3)",
+                          padding: "var(--space-3) var(--space-4)",
+                          borderTop: idx > 0 ? "1px solid var(--separator)" : undefined,
+                        }}
+                      >
+                        <StatusDot status={c.status} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: "var(--text-body)",
+                              fontWeight: "var(--weight-medium)",
+                              color: "var(--text-primary)",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {c.name}
+                          </div>
+                          {c.lastError && (
+                            <div
+                              style={{
+                                fontSize: "var(--text-caption1)",
+                                color: "var(--system-red)",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                marginTop: 1,
+                              }}
+                            >
+                              {c.lastError}
+                            </div>
+                          )}
+                        </div>
+                        <span
+                          style={{
+                            fontSize: "var(--text-caption1)",
+                            fontFamily: "var(--font-mono)",
+                            color: "var(--text-tertiary)",
+                            flexShrink: 0,
+                            background: "var(--fill-quaternary)",
+                            padding: "2px 6px",
+                            borderRadius: 4,
+                          }}
+                        >
+                          {c.schedule}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
