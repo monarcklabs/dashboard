@@ -5,10 +5,10 @@
   "homepage": "https://clawport.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/openclaw/clawport.git"
+    "url": "https://github.com/JohnRiceML/clawport-ui.git"
   },
   "bugs": {
-    "url": "https://github.com/openclaw/clawport/issues"
+    "url": "https://github.com/JohnRiceML/clawport-ui/issues"
   },
   "keywords": [
     "openclaw",

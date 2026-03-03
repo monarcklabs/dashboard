@@ -42,8 +42,8 @@ TypeScript interfaces, function names, component names, and variable names. Thes
 | `setPortalSubtitle` (setter) | Same as `setPortalName` | |
 | `setPortalEmoji` (setter) | Same as `setPortalName` | |
 | `setPortalIcon` (setter) | Same as `setPortalName` | |
-| `OrgMap` (component) | `components/ManorMap.tsx`, `app/page.tsx`, `docs/COMPONENTS.md` | React Flow org chart component. |
-| `OrgMapProps` (interface) | `components/ManorMap.tsx` | Props type for OrgMap. |
+| `OrgMap` (component) | `components/OrgMap.tsx`, `app/page.tsx`, `docs/COMPONENTS.md` | React Flow org chart component. |
+| `OrgMapProps` (interface) | `components/OrgMap.tsx` | Props type for OrgMap. |
 | `HomePage` (component) | `app/page.tsx` | Home page component. |
 | `handleIconUpload` (function) | `app/settings/page.tsx` | Icon upload handler. |
 | `iconInputRef` (ref) | `app/settings/page.tsx` | File input ref. |

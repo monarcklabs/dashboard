@@ -12,7 +12,7 @@ import { GridView } from "@/components/GridView"
 import { FeedView } from "@/components/FeedView"
 
 const OrgMap = dynamic(
-  () => import("@/components/ManorMap").then((m) => ({ default: m.OrgMap })),
+  () => import("@/components/OrgMap").then((m) => ({ default: m.OrgMap })),
   {
     ssr: false,
     loading: () => (
