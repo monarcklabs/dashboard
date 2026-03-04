@@ -58,17 +58,33 @@ interface WorkResult {
   error?: string
 }
 
+const WORK_TIMEOUT_MS = 120_000 // 2 minutes
+
 export async function executeWork(
   agentId: string,
   ticket: KanbanTicket,
   onChunk?: (chunk: string) => void,
+  externalSignal?: AbortSignal,
 ): Promise<WorkResult> {
   const prompt = getWorkPrompt(ticket)
 
   try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), WORK_TIMEOUT_MS)
+
+    // Forward external abort (e.g. component unmount) to our controller
+    if (externalSignal) {
+      if (externalSignal.aborted) {
+        clearTimeout(timeoutId)
+        return { success: false, content: '', error: 'Cancelled' }
+      }
+      externalSignal.addEventListener('abort', () => controller.abort(), { once: true })
+    }
+
     const res = await fetch(`/api/kanban/chat/${agentId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         messages: [{ role: 'user', content: prompt }],
         ticket: {
@@ -77,11 +93,13 @@ export async function executeWork(
           status: ticket.status,
           priority: ticket.priority,
           assigneeRole: ticket.assigneeRole,
+          workResult: ticket.workResult,
         },
       }),
     })
 
     if (!res.ok || !res.body) {
+      clearTimeout(timeoutId)
       return { success: false, content: '', error: `API error: ${res.status}` }
     }
 
@@ -90,25 +108,32 @@ export async function executeWork(
     let buffer = ''
     let fullContent = ''
 
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
 
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
 
-      for (const line of lines) {
-        if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-          try {
-            const chunk = JSON.parse(line.slice(6))
-            if (chunk.content) {
-              fullContent += chunk.content
-              onChunk?.(chunk.content)
-            }
-          } catch { /* skip malformed chunks */ }
+        for (const line of lines) {
+          if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+            try {
+              const chunk = JSON.parse(line.slice(6))
+              if (chunk.error) {
+                return { success: false, content: fullContent, error: `Stream error: ${chunk.error}` }
+              }
+              if (chunk.content) {
+                fullContent += chunk.content
+                onChunk?.(chunk.content)
+              }
+            } catch { /* skip malformed chunks */ }
+          }
         }
       }
+    } finally {
+      clearTimeout(timeoutId)
     }
 
     if (!fullContent) {
@@ -117,6 +142,9 @@ export async function executeWork(
 
     return { success: true, content: fullContent }
   } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      return { success: false, content: '', error: 'Agent work timed out' }
+    }
     const message = err instanceof Error ? err.message : 'Unknown error'
     return { success: false, content: '', error: message }
   }

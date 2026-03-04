@@ -166,11 +166,14 @@ export function OnboardingWizard({ forceOpen, onClose }: OnboardingWizardProps) 
   const TOTAL_STEPS = 7
 
   const handleNext = useCallback(() => {
-    // Commit values on step 2 (naming step)
+    // Commit operator name on step 1 (system check)
+    if (step === 1) {
+      setOperatorName(localOperator || null)
+    }
+    // Commit dashboard name/subtitle on step 2 (naming step)
     if (step === 2) {
       setPortalName(localName || null)
       setPortalSubtitle(localSubtitle || null)
-      setOperatorName(localOperator || null)
     }
 
     if (step < TOTAL_STEPS - 1) {
@@ -357,6 +360,30 @@ export function OnboardingWizard({ forceOpen, onClose }: OnboardingWizardProps) 
                 Verifying your OpenClaw connection...
               </p>
 
+              {/* Your Name input */}
+              <div style={{ marginBottom: 'var(--space-4)' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: 'var(--text-caption1)',
+                  color: 'var(--text-tertiary)',
+                  marginBottom: 'var(--space-1)',
+                }}>
+                  Your Name
+                </label>
+                <input
+                  type="text"
+                  className="apple-input"
+                  placeholder="Your Name"
+                  value={localOperator}
+                  onChange={e => setLocalOperator(e.target.value)}
+                  style={{
+                    width: '100%',
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--separator)',
+                  }}
+                />
+              </div>
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                 {/* Agent registry check */}
                 <div style={{
@@ -508,7 +535,7 @@ export function OnboardingWizard({ forceOpen, onClose }: OnboardingWizardProps) 
                       padding: '1px 4px',
                       borderRadius: 3,
                       color: 'var(--code-text)',
-                    }}>npm run setup</code> in your terminal to auto-detect and configure your environment.
+                    }}>clawport setup</code> in your terminal to auto-detect and configure your environment.
                     You can continue setup and fix this later.
                   </div>
                 </div>
@@ -608,28 +635,6 @@ export function OnboardingWizard({ forceOpen, onClose }: OnboardingWizardProps) 
                   />
                 </div>
 
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: 'var(--text-caption1)',
-                    color: 'var(--text-tertiary)',
-                    marginBottom: 'var(--space-1)',
-                  }}>
-                    Your Name
-                  </label>
-                  <input
-                    type="text"
-                    className="apple-input"
-                    placeholder="Your Name"
-                    value={localOperator}
-                    onChange={e => setLocalOperator(e.target.value)}
-                    style={{
-                      width: '100%',
-                      background: 'var(--bg-secondary)',
-                      border: '1px solid var(--separator)',
-                    }}
-                  />
-                </div>
               </div>
 
               {/* Mini sidebar preview */}
@@ -657,7 +662,7 @@ export function OnboardingWizard({ forceOpen, onClose }: OnboardingWizardProps) 
                     borderRadius: 8,
                     background: settings.accentColor
                       ? `linear-gradient(135deg, ${settings.accentColor}, ${settings.accentColor}dd)`
-                      : 'linear-gradient(135deg, #f5c518, #e8b800)',
+                      : 'transparent',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',

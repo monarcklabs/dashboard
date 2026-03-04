@@ -107,6 +107,13 @@ describe('getChatMessages', () => {
 })
 
 describe('appendChatMessages', () => {
+  beforeEach(() => {
+    // Reset readFileSync so dedup doesn't pick up stale mock data
+    mockReadFileSync.mockReset()
+    // Simulate no existing file so dedup is skipped
+    mockExistsSync.mockReturnValue(false)
+  })
+
   it('creates directory and appends messages as JSONL', () => {
     const messages: StoredChatMessage[] = [
       { id: 'a', role: 'user', content: 'hello', timestamp: 1000 },

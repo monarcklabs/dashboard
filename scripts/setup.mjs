@@ -48,7 +48,8 @@ function detectWorkspacePath() {
 }
 
 function detectOpenClawBin() {
-  return exec('which openclaw')
+  const cmd = process.platform === 'win32' ? 'where' : 'which'
+  return exec(`${cmd} openclaw`)
 }
 
 function detectGatewayToken() {
@@ -63,9 +64,15 @@ function detectGatewayToken() {
   }
 }
 
-function checkGatewayRunning() {
-  const result = exec('curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:18789/ 2>/dev/null')
-  return result && result !== '000'
+async function checkGatewayRunning() {
+  try {
+    const res = await fetch('http://127.0.0.1:18789/', {
+      signal: AbortSignal.timeout(3000),
+    })
+    return res.ok || res.status > 0
+  } catch {
+    return false
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -84,7 +91,7 @@ async function main() {
     OPENCLAW_GATEWAY_TOKEN: detectGatewayToken(),
   }
 
-  const gatewayUp = checkGatewayRunning()
+  const gatewayUp = await checkGatewayRunning()
 
   // Report findings
   const entries = [
@@ -203,12 +210,13 @@ async function main() {
   console.log()
   console.log(`  ${green('Done!')} .env.local written.`)
   console.log()
+  const startCmd = cwdFlag ? 'clawport dev' : 'npm run dev'
   console.log(`  Next steps:`)
   if (!gatewayUp) {
     console.log(`    1. Start the gateway:  ${dim('openclaw gateway run')}`)
-    console.log(`    2. Start ClawPort:   ${dim('npm run dev')}`)
+    console.log(`    2. Start ClawPort:     ${dim(startCmd)}`)
   } else {
-    console.log(`    ${dim('npm run dev')}`)
+    console.log(`    ${dim(startCmd)}`)
   }
   console.log()
 }

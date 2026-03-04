@@ -64,13 +64,23 @@ export function getChatMessages(ticketId: string): StoredChatMessage[] {
 /**
  * Append chat messages to a ticket's JSONL file.
  * Creates the chats directory and file if they don't exist.
+ * Deduplicates by message ID to prevent duplicates on retry.
  */
 export function appendChatMessages(ticketId: string, messages: StoredChatMessage[]): void {
   const chatsDir = getChatsDir()
   mkdirSync(chatsDir, { recursive: true })
 
   const filePath = path.join(chatsDir, `${ticketId}.jsonl`)
-  const lines = messages.map(m => JSON.stringify({
+
+  // Deduplicate against existing messages if file exists
+  let newMessages = messages
+  if (existsSync(filePath)) {
+    const existing = getChatMessages(ticketId)
+    const existingIds = new Set(existing.map(m => m.id))
+    newMessages = messages.filter(m => !existingIds.has(m.id))
+    if (newMessages.length === 0) return
+  }
+  const lines = newMessages.map(m => JSON.stringify({
     id: m.id,
     role: m.role,
     content: m.content,

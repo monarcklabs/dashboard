@@ -64,6 +64,7 @@ export default function SettingsPage() {
     setAccentColor,
     setPortalName,
     setPortalSubtitle,
+    setOperatorName,
     setPortalEmoji,
     setPortalIcon,
     setIconBgHidden,
@@ -78,6 +79,7 @@ export default function SettingsPage() {
   const [expandedAgent, setExpandedAgent] = useState<string | null>(null)
   const [nameValue, setNameValue] = useState(settings.portalName ?? '')
   const [subtitleValue, setSubtitleValue] = useState(settings.portalSubtitle ?? '')
+  const [operatorNameValue, setOperatorNameValue] = useState(settings.operatorName ?? '')
   const [emojiValue, setEmojiValue] = useState(settings.portalEmoji ?? '')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const portalIconInputRef = useRef<HTMLInputElement>(null)
@@ -86,8 +88,9 @@ export default function SettingsPage() {
   useEffect(() => {
     setNameValue(settings.portalName ?? '')
     setSubtitleValue(settings.portalSubtitle ?? '')
+    setOperatorNameValue(settings.operatorName ?? '')
     setEmojiValue(settings.portalEmoji ?? '')
-  }, [settings.portalName, settings.portalSubtitle, settings.portalEmoji])
+  }, [settings.portalName, settings.portalSubtitle, settings.operatorName, settings.portalEmoji])
 
   // Fetch agents
   useEffect(() => {
@@ -331,6 +334,35 @@ export default function SettingsPage() {
 
             <div style={{ borderTop: '1px solid var(--separator)' }} />
 
+            {/* Your Name field */}
+            <div style={{ padding: 'var(--space-3) var(--space-4)' }}>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: 'var(--text-caption1)',
+                  color: 'var(--text-tertiary)',
+                  marginBottom: 'var(--space-1)',
+                }}
+              >
+                Your Name
+              </label>
+              <input
+                type="text"
+                className="apple-input"
+                placeholder="Your Name"
+                value={operatorNameValue}
+                onChange={(e) => setOperatorNameValue(e.target.value)}
+                onBlur={() => setOperatorName(operatorNameValue || null)}
+                style={{
+                  width: '100%',
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--separator)',
+                }}
+              />
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--separator)' }} />
+
             {/* Logo / Icon — emoji or image */}
             <div style={{ padding: 'var(--space-3) var(--space-4)' }}>
               <label
@@ -368,7 +400,7 @@ export default function SettingsPage() {
                         ? 'transparent'
                         : settings.accentColor
                           ? `linear-gradient(135deg, ${settings.accentColor}, ${settings.accentColor}dd)`
-                          : 'linear-gradient(135deg, #f5c518, #e8b800)',
+                          : 'transparent',
                       boxShadow: settings.iconBgHidden ? 'none' : 'var(--shadow-card)',
                       display: 'flex',
                       alignItems: 'center',

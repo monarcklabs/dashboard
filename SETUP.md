@@ -155,13 +155,23 @@ All of these can be changed later in the Settings page. The wizard just gets you
 
 ## 5. Agent Customization
 
-### Using the Bundled Registry
+### Auto-Discovery (Default)
 
-ClawPort ships with a default agent registry at `lib/agents.json`. This is a working example showing a full team hierarchy. It works out of the box if your OpenClaw workspace has matching agent SOUL files.
+ClawPort automatically discovers your agents from your OpenClaw workspace. It scans `$WORKSPACE_PATH/agents/` for subdirectories containing a `SOUL.md` file. Each becomes an agent in the dashboard with:
 
-### Using Your Own Agents
+- **ID** from the directory name (e.g., `agents/pulse/` becomes agent `pulse`)
+- **Name** from the first `# Heading` in `SOUL.md`, or the directory name as fallback
+- **Role/Title** from a `Role:` or `Title:` line in `SOUL.md`, or "Agent" as default
 
-To define your own agent team, create a file at:
+If `$WORKSPACE_PATH/SOUL.md` exists, it becomes the root orchestrator and all discovered agents report to it.
+
+Cron jobs are matched to agents dynamically by name prefix (e.g., a cron named `pulse-trending` is matched to the `pulse` agent).
+
+**No configuration needed** -- if you have an OpenClaw workspace with agents, ClawPort will find and display them automatically.
+
+### Using a Custom Registry
+
+For full control over names, colors, emoji, hierarchy, and tools, create a file at:
 
 ```
 $WORKSPACE_PATH/clawport/agents.json
@@ -173,7 +183,13 @@ For example, if your `WORKSPACE_PATH` is `/Users/yourname/.openclaw/workspace`:
 mkdir -p /Users/yourname/.openclaw/workspace/clawport
 ```
 
-Then create `agents.json` in that directory. ClawPort checks for this file on every request. If it exists, it replaces the bundled registry entirely. If it's missing or contains invalid JSON, the bundled default is used as a fallback.
+Then create `agents.json` in that directory. ClawPort checks for this file on every request. If it exists, it replaces auto-discovery entirely.
+
+### Resolution Order
+
+1. **User override** -- `$WORKSPACE_PATH/clawport/agents.json` (if exists and valid JSON)
+2. **Auto-discovery** -- scans `$WORKSPACE_PATH/agents/` subdirectories
+3. **Bundled fallback** -- `lib/agents.json` (example team for demo purposes)
 
 ### Agent Entry Format
 
@@ -274,6 +290,40 @@ The production server runs on port 3000 by default. The gateway still needs to b
 ---
 
 ## Troubleshooting
+
+### EACCES / EEXIST / permission denied during `npm install -g`
+
+If you see `EACCES: permission denied`, `EEXIST`, or a failed rename in `~/.npm/_cacache` when running `npm install -g clawport-ui`, your npm cache is corrupted or has broken permissions (usually from a previous `sudo npm install`).
+
+**Quick fix** -- clear the cache and retry:
+
+```bash
+sudo npm cache clean --force
+npm install -g clawport-ui
+```
+
+If that still fails, fix the underlying permissions:
+
+```bash
+sudo chown -R $(whoami) ~/.npm
+npm prefix -g
+# Fix permissions on the prefix path, e.g.:
+sudo chown -R $(whoami) /usr/local/lib/node_modules
+sudo chown -R $(whoami) /usr/local/bin
+npm install -g clawport-ui
+```
+
+**Alternative** -- avoid sudo entirely by installing globals to your home directory:
+
+```bash
+mkdir -p ~/.npm-global
+npm config set prefix '~/.npm-global'
+echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.zshrc
+source ~/.zshrc
+npm install -g clawport-ui
+```
+
+> **Warning:** Never use `sudo npm install -g` -- it creates root-owned files that cause permission errors on every future install. Use `nvm` or the `~/.npm-global` prefix approach instead.
 
 ### "Missing required environment variable: WORKSPACE_PATH"
 

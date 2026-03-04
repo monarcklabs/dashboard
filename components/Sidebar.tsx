@@ -60,7 +60,7 @@ export function Sidebar() {
                     ? 'transparent'
                     : settings.accentColor
                       ? `linear-gradient(135deg, ${settings.accentColor}, ${settings.accentColor}dd)`
-                      : 'linear-gradient(135deg, #f5c518, #e8b800)',
+                      : 'transparent',
                   boxShadow: settings.iconBgHidden ? 'none' : 'var(--shadow-card)',
                   display: 'flex',
                   alignItems: 'center',

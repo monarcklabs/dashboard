@@ -8,6 +8,20 @@ const openai = new OpenAI({
   apiKey: process.env.OPENCLAW_GATEWAY_TOKEN,
 })
 
+const MAX_TITLE = 500
+const MAX_DESC = 5000
+const MAX_RESULT = 10000
+
+function isValidMessage(m: unknown): m is { role: 'user' | 'assistant'; content: string } {
+  if (!m || typeof m !== 'object') return false
+  const msg = m as Record<string, unknown>
+  return (
+    (msg.role === 'user' || msg.role === 'assistant') &&
+    typeof msg.content === 'string' &&
+    msg.content.length > 0
+  )
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -32,24 +46,27 @@ export async function POST(
     )
   }
 
-  const { messages, ticket } = body as {
-    messages: { role: 'user' | 'assistant'; content: string }[]
-    ticket: {
-      title: string
-      description: string
-      status: string
-      priority: string
-      assigneeRole: string | null
-      workResult: string | null
-    }
-  }
-
-  if (!Array.isArray(messages)) {
+  const rawMessages = body.messages
+  if (!Array.isArray(rawMessages) || !rawMessages.every(isValidMessage)) {
     return new Response(
-      JSON.stringify({ error: 'messages must be an array' }),
+      JSON.stringify({ error: 'messages must be an array of {role, content} objects' }),
       { status: 400, headers: { 'Content-Type': 'application/json' } }
     )
   }
+  const messages = rawMessages as { role: 'user' | 'assistant'; content: string }[]
+
+  // Sanitize and truncate ticket fields
+  const rawTicket = body.ticket as Record<string, unknown> | undefined
+  const ticket = rawTicket
+    ? {
+        title: String(rawTicket.title || '').slice(0, MAX_TITLE),
+        description: String(rawTicket.description || '').slice(0, MAX_DESC),
+        status: String(rawTicket.status || ''),
+        priority: String(rawTicket.priority || ''),
+        assigneeRole: typeof rawTicket.assigneeRole === 'string' ? rawTicket.assigneeRole : null,
+        workResult: typeof rawTicket.workResult === 'string' ? rawTicket.workResult.slice(0, MAX_RESULT) : null,
+      }
+    : null
 
   // Build system prompt with ticket context
   const workContext = ticket?.workResult
@@ -94,7 +111,12 @@ Help the user with this ticket. Stay in character as ${agent.name}, ${agent.titl
           }
           controller.enqueue(encoder.encode('data: [DONE]\n\n'))
         } catch (err) {
-          console.error('Kanban chat stream error:', err)
+          const errMsg = err instanceof Error ? err.message : 'Stream interrupted'
+          console.error(`Kanban chat stream error [agentId=${id}]:`, errMsg)
+          // Signal error to client before closing
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ error: errMsg })}\n\n`)
+          )
           controller.enqueue(encoder.encode('data: [DONE]\n\n'))
         } finally {
           controller.close()
@@ -110,7 +132,8 @@ Help the user with this ticket. Stay in character as ${agent.name}, ${agent.titl
       },
     })
   } catch (err) {
-    console.error('Kanban chat API error:', err)
+    const errMsg = err instanceof Error ? err.message : 'Unknown error'
+    console.error(`Kanban chat API error [agentId=${id}]:`, errMsg)
     return new Response(
       JSON.stringify({ error: 'Chat failed. Make sure OpenClaw gateway is running.' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }

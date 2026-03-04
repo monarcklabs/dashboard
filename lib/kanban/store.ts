@@ -1,27 +1,65 @@
 'use client'
 
-import type { KanbanTicket, TicketStatus } from './types'
+import type { KanbanTicket, TicketStatus, TicketPriority, WorkState } from './types'
 
 export type KanbanStore = Record<string, KanbanTicket>
 
 const STORAGE_KEY = 'clawport-kanban'
+
+const VALID_STATUSES = new Set<TicketStatus>(['backlog', 'todo', 'in-progress', 'review', 'done'])
+const VALID_PRIORITIES = new Set<TicketPriority>(['low', 'medium', 'high'])
+const VALID_WORK_STATES = new Set<WorkState>(['idle', 'starting', 'working', 'done', 'failed'])
+
+/** Validate and sanitize a ticket loaded from localStorage */
+function sanitizeTicket(id: string, raw: Record<string, unknown>): KanbanTicket | null {
+  // Require essential fields
+  if (typeof raw.title !== 'string' || !raw.title) return null
+
+  const status = (VALID_STATUSES.has(raw.status as TicketStatus) ? raw.status : 'backlog') as TicketStatus
+  const priority = (VALID_PRIORITIES.has(raw.priority as TicketPriority) ? raw.priority : 'medium') as TicketPriority
+  const workState = (VALID_WORK_STATES.has(raw.workState as WorkState) ? raw.workState : 'idle') as WorkState
+
+  return {
+    id,
+    title: raw.title as string,
+    description: typeof raw.description === 'string' ? raw.description : '',
+    status,
+    priority,
+    assigneeId: typeof raw.assigneeId === 'string' ? raw.assigneeId : null,
+    assigneeRole: typeof raw.assigneeRole === 'string' ? raw.assigneeRole as KanbanTicket['assigneeRole'] : null,
+    workState,
+    workStartedAt: typeof raw.workStartedAt === 'number' ? raw.workStartedAt : null,
+    workError: typeof raw.workError === 'string' ? raw.workError : null,
+    workResult: typeof raw.workResult === 'string' ? raw.workResult : null,
+    createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : 0,
+    updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : (typeof raw.createdAt === 'number' ? raw.createdAt : 0),
+  }
+}
 
 export function loadTickets(): KanbanStore {
   if (typeof window === 'undefined') return {}
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return {}
-    const store: KanbanStore = JSON.parse(raw)
-    // Backfill work state fields for existing tickets
-    for (const id of Object.keys(store)) {
-      store[id] = {
-        ...store[id],
-        workState: store[id].workState ?? 'idle',
-        workStartedAt: store[id].workStartedAt ?? null,
-        workError: store[id].workError ?? null,
-        workResult: store[id].workResult ?? null,
+    const parsed = JSON.parse(raw) as Record<string, Record<string, unknown>>
+    const store: KanbanStore = {}
+
+    for (const id of Object.keys(parsed)) {
+      const ticket = sanitizeTicket(id, parsed[id])
+      if (!ticket) continue // Skip corrupted entries
+
+      // Recover tickets stuck mid-work (e.g. page reload during streaming).
+      // Reset them to todo/idle so auto-work can re-trigger.
+      if (ticket.workState === 'working' || ticket.workState === 'starting') {
+        ticket.status = 'todo'
+        ticket.workState = 'idle'
+        ticket.workStartedAt = null
+        ticket.workError = null
       }
+
+      store[id] = ticket
     }
+
     return store
   } catch {
     return {}

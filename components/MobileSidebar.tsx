@@ -116,7 +116,7 @@ export function MobileSidebar({
                 borderRadius: '6px',
                 background: settings.accentColor
                   ? `linear-gradient(135deg, ${settings.accentColor}, ${settings.accentColor}dd)`
-                  : 'linear-gradient(135deg, #f5c518, #e8b800)',
+                  : 'transparent',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -202,7 +202,7 @@ export function MobileSidebar({
                   borderRadius: '10px',
                   background: settings.accentColor
                     ? `linear-gradient(135deg, ${settings.accentColor}, ${settings.accentColor}dd)`
-                    : 'linear-gradient(135deg, #f5c518, #e8b800)',
+                    : 'transparent',
                   boxShadow: 'var(--shadow-card)',
                   display: 'flex',
                   alignItems: 'center',

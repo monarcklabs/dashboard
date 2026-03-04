@@ -19,57 +19,53 @@ export function TroubleshootingSection() {
 
       {/* ── npm install permission errors ──────────────────────── */}
       <SubHeading>
-        EACCES / permission denied during npm install -g
+        EACCES / EEXIST / permission denied during npm install -g
       </SubHeading>
       <Paragraph>
         If you see errors like <InlineCode>EACCES: permission denied</InlineCode>,{" "}
-        <InlineCode>EEXIST</InlineCode>, or{" "}
-        <InlineCode>Invalid response body while trying to fetch</InlineCode> when
+        <InlineCode>EEXIST</InlineCode>,{" "}
+        <InlineCode>Invalid response body while trying to fetch</InlineCode>, or
+        a failed rename in <InlineCode>~/.npm/_cacache</InlineCode> when
         running <InlineCode>npm install -g clawport-ui</InlineCode>, your npm
-        cache directory has broken permissions. This usually happens if{" "}
+        cache is corrupted or has broken permissions. This usually happens if{" "}
         <InlineCode>npm install -g</InlineCode> was previously run with{" "}
         <InlineCode>sudo</InlineCode>.
       </Paragraph>
       <Paragraph>
-        Fix it in three steps:
+        <strong style={{ color: "var(--text-primary)" }}>Quick fix</strong> --
+        clear the cache and retry:
       </Paragraph>
-      <NumberedList
-        items={[
-          <>
-            <strong style={{ color: "var(--text-primary)" }}>
-              Fix cache permissions
-            </strong>
-          </>,
-          <>
-            <strong style={{ color: "var(--text-primary)" }}>
-              Fix global node_modules permissions
-            </strong>
-          </>,
-          <>
-            <strong style={{ color: "var(--text-primary)" }}>
-              Retry the install
-            </strong>
-          </>,
-        ]}
-      />
       <CodeBlock title="terminal">
-        {`# 1. Fix npm cache ownership
+        {`sudo npm cache clean --force
+npm install -g clawport-ui`}
+      </CodeBlock>
+      <Paragraph>
+        If that still fails, fix the underlying permissions:
+      </Paragraph>
+      <CodeBlock title="terminal">
+        {`# Fix npm cache ownership
 sudo chown -R $(whoami) ~/.npm
 
-# 2. Fix global node_modules ownership (find your prefix first)
+# Fix global node_modules ownership (find your prefix first)
 npm prefix -g
 # Then fix permissions on that path, e.g.:
 sudo chown -R $(whoami) /usr/local/lib/node_modules
 sudo chown -R $(whoami) /usr/local/bin
 
-# 3. Retry without sudo
+# Retry without sudo
 npm install -g clawport-ui`}
       </CodeBlock>
       <Paragraph>
-        If that still fails, clear the cache entirely and retry:
+        <strong style={{ color: "var(--text-primary)" }}>
+          Alternative: avoid sudo entirely
+        </strong>{" "}
+        -- configure npm to install globals in your home directory:
       </Paragraph>
       <CodeBlock title="terminal">
-        {`npm cache clean --force
+        {`mkdir -p ~/.npm-global
+npm config set prefix '~/.npm-global'
+echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.zshrc
+source ~/.zshrc
 npm install -g clawport-ui`}
       </CodeBlock>
       <Callout type="warning">
@@ -77,8 +73,9 @@ npm install -g clawport-ui`}
         root-owned files in your user's npm cache and global directories, which
         causes permission errors on every future install. If your setup requires
         sudo for global installs, consider using{" "}
-        <InlineCode>nvm</InlineCode> (Node Version Manager) instead, which
-        installs Node and global packages in your home directory with no
+        <InlineCode>nvm</InlineCode> (Node Version Manager) or the{" "}
+        <InlineCode>~/.npm-global</InlineCode> prefix approach above, which
+        install Node and global packages in your home directory with no
         permission issues.
       </Callout>
 

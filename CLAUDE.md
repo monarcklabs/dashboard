@@ -56,10 +56,15 @@ Run `npm run setup` to auto-detect all required values from your local OpenClaw 
 ```
 loadRegistry() checks:
   1. $WORKSPACE_PATH/clawport/agents.json  (user override)
-  2. Bundled lib/agents.json            (default)
+  2. Auto-discovered from $WORKSPACE_PATH   (agents/ directory scan)
+  3. Bundled lib/agents.json               (default example)
 ```
 
-`lib/agents-registry.ts` exports `loadRegistry()`. `lib/agents.ts` calls it to build the full agent list (merging in SOUL.md content from the workspace). Users customize their agent team by dropping an `agents.json` into their workspace -- no source edits needed.
+`lib/agents-registry.ts` exports `loadRegistry()`. `lib/agents.ts` calls it to build the full agent list (merging in SOUL.md content from the workspace).
+
+**Auto-discovery** scans `$WORKSPACE_PATH/agents/` for subdirectories containing a `SOUL.md` file. Each becomes an agent entry with sensible defaults (color from rotating palette, name from SOUL.md heading or directory slug). If `$WORKSPACE_PATH/SOUL.md` exists, it becomes the root orchestrator. This means any OpenClaw workspace works out of the box -- no `agents.json` needed.
+
+Users can still drop a `clawport/agents.json` into their workspace for full control over names, colors, hierarchy, and tools.
 
 ### operatorName Flow
 
@@ -175,7 +180,7 @@ Used by: `lib/memory.ts`, `lib/cron-runs.ts`, `lib/kanban/chat-store.ts`, `lib/c
 | `lib/anthropic.ts` | Vision pipeline: `hasImageContent`, `extractImageAttachments`, `buildTextPrompt`, `sendViaOpenClaw` (send + poll), `execCli` |
 | `lib/audio-recorder.ts` | `createAudioRecorder()` -- MediaRecorder + waveform via AnalyserNode |
 | `lib/conversations.ts` | Conversation store with localStorage persistence |
-| `lib/crons.ts` | Cron data fetching via CLI |
+| `lib/crons.ts` | Cron data fetching via CLI, dynamic agent matching by ID prefix |
 | `lib/env.ts` | `requireEnv(name)` -- safe env var access with clear errors |
 | `lib/multimodal.ts` | `buildApiContent()` -- converts Message+Media to OpenAI API format |
 | `lib/settings.ts` | `ClawPortSettings` type, `loadSettings()`, `saveSettings()` (localStorage) |

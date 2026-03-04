@@ -2,29 +2,17 @@ import { CronJob, CronDelivery } from '@/lib/types'
 import { execSync } from 'child_process'
 import { parseSchedule, describeCron } from './cron-utils'
 import { requireEnv } from '@/lib/env'
+import { loadRegistry } from '@/lib/agents-registry'
 
-const PREFIX_MAP: [string, string][] = [
-  ['pulse-', 'pulse'],
-  ['herald-', 'herald'],
-  ['robin-', 'robin'],
-  ['seo-team-', 'lumen'],
-  ['seo-', 'lumen'],
-  ['echo-', 'echo'],
-  ['spark-', 'spark'],
-  ['scribe-', 'scribe'],
-  ['kaze-', 'kaze'],
-  ['vault-', 'jarvis'],
-  ['builder-', 'jarvis'],
-  ['clawport-', 'jarvis'],
-  ['maven-', 'maven'],
-  ['recon-', 'robin'],
-  ['team-memory-', 'scribe'],
-  ['mochi-', 'pulse'],
-]
-
-function matchAgent(name: string): string | null {
-  for (const [prefix, agentId] of PREFIX_MAP) {
-    if (name.startsWith(prefix)) return agentId
+/**
+ * Match a cron job name to an agent by prefix.
+ * Tries each known agent ID as a prefix (longest first to avoid
+ * partial matches, e.g. "seo-team" matches before "seo").
+ */
+function matchAgent(name: string, agentIds: string[]): string | null {
+  const sorted = [...agentIds].sort((a, b) => b.length - a.length)
+  for (const id of sorted) {
+    if (name === id || name.startsWith(id + '-')) return id
   }
   return null
 }
@@ -41,6 +29,9 @@ export async function getCrons(): Promise<CronJob[]> {
     const jobs: unknown[] = Array.isArray(parsed)
       ? parsed
       : parsed.jobs ?? parsed.data ?? []
+
+    // Load known agent IDs for dynamic cron-to-agent matching
+    const agentIds = loadRegistry().map(a => a.id)
 
     return jobs.map((job: unknown) => {
       const j = job as Record<string, unknown>
@@ -97,7 +88,7 @@ export async function getCrons(): Promise<CronJob[]> {
         lastRun,
         nextRun,
         lastError,
-        agentId: matchAgent(name),
+        agentId: matchAgent(name, agentIds),
         description: typeof j.description === 'string' ? j.description : null,
         enabled: j.enabled !== false,
         delivery,

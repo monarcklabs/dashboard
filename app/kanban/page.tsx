@@ -86,6 +86,11 @@ export default function KanbanPage() {
   }
 
   function handleMoveTicket(ticketId: string, status: TicketStatus) {
+    // Block manual moves while agent work is in-flight
+    const ticket = tickets[ticketId]
+    if (ticket && (ticket.workState === 'working' || ticket.workState === 'starting')) {
+      return
+    }
     setTickets((prev) => moveTicket(prev, ticketId, status))
   }
 

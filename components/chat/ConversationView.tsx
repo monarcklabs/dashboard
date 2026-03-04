@@ -876,34 +876,6 @@ export function ConversationView({ agent, conversation, onUpdate, onBack }: Conv
                             verticalAlign: 'text-bottom',
                           }} />
                         )}
-                        {/* TTS listen button */}
-                        {!isLastAssistant && textContent && (
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
-                            <button
-                              onClick={() => playTts(msg.id, textContent)}
-                              disabled={ttsLoadingId === msg.id}
-                              title={ttsPlayingId === msg.id ? 'Stop listening' : 'Listen'}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                cursor: ttsLoadingId === msg.id ? 'wait' : 'pointer',
-                                padding: '2px 4px',
-                                borderRadius: 'var(--radius-sm)',
-                                color: ttsPlayingId === msg.id ? 'var(--accent)' : 'var(--text-tertiary)',
-                                opacity: ttsLoadingId === msg.id ? 0.6 : 0.7,
-                                transition: 'all 150ms ease',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 4,
-                                animation: ttsLoadingId === msg.id ? 'pulse-red 1.5s ease-in-out infinite' : 'none',
-                              }}
-                              onMouseEnter={e => { e.currentTarget.style.opacity = '1' }}
-                              onMouseLeave={e => { e.currentTarget.style.opacity = ttsPlayingId === msg.id ? '1' : '0.7' }}
-                            >
-                              {ttsPlayingId === msg.id ? speakerStopIcon : speakerPlayIcon}
-                            </button>
-                          </div>
-                        )}
                       </div>
                     )}
 

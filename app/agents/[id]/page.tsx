@@ -1,11 +1,37 @@
 "use client"
-import { useEffect, useState, use, useCallback } from "react"
+import { useEffect, useState, useRef, use, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { Upload, X } from "lucide-react"
 import type { Agent, CronJob } from "@/lib/types"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ErrorState } from "@/components/ErrorState"
 import { AgentAvatar } from "@/components/AgentAvatar"
+import { useSettings } from "@/app/settings-provider"
+
+function resizeImage(file: File, maxSize: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const reader = new FileReader()
+    reader.onload = () => {
+      img.onload = () => {
+        const scale = Math.min(maxSize / img.width, maxSize / img.height, 1)
+        const w = Math.round(img.width * scale)
+        const h = Math.round(img.height * scale)
+        const canvas = document.createElement("canvas")
+        canvas.width = w
+        canvas.height = h
+        const ctx = canvas.getContext("2d")!
+        ctx.drawImage(img, 0, 0, w, h)
+        resolve(canvas.toDataURL("image/jpeg", 0.85))
+      }
+      img.onerror = reject
+      img.src = reader.result as string
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
 
 const TOOL_ICONS: Record<string, string> = {
   web_search: "\uD83D\uDD0D",
@@ -231,6 +257,8 @@ export default function AgentDetailPage({
 }) {
   const { id } = use(params)
   const router = useRouter()
+  const { settings, setAgentOverride, clearAgentOverride } = useSettings()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [agent, setAgent] = useState<Agent | null>(null)
   const [allAgents, setAllAgents] = useState<Agent[]>([])
   const [crons, setCrons] = useState<CronJob[]>([])
@@ -262,6 +290,15 @@ export default function AgentDetailPage({
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  async function handleImageUpload(file: File) {
+    try {
+      const dataUrl = await resizeImage(file, 200)
+      setAgentOverride(id, { profileImage: dataUrl })
+    } catch {
+      // silently fail
+    }
+  }
 
   if (loading) return <DetailSkeleton />
   if (error) return <ErrorState message={error} onRetry={loadData} />
@@ -365,7 +402,71 @@ export default function AgentDetailPage({
       >
         {/* ── Hero section ── */}
         <div className="flex items-start gap-4">
-          <AgentAvatar agent={agent} size={64} borderRadius={16} />
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <AgentAvatar agent={agent} size={64} borderRadius={16} />
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                marginTop: "var(--space-2)",
+                justifyContent: "center",
+              }}
+            >
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                title="Upload profile image"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "2px 8px",
+                  borderRadius: "var(--radius-sm)",
+                  background: "var(--fill-tertiary)",
+                  color: "var(--text-tertiary)",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "var(--text-caption2)",
+                  fontWeight: "var(--weight-medium)",
+                }}
+              >
+                <Upload size={10} />
+                Photo
+              </button>
+              {settings.agentOverrides[agent.id]?.profileImage && (
+                <button
+                  onClick={() => setAgentOverride(agent.id, { profileImage: undefined })}
+                  title="Remove photo"
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: "50%",
+                    background: "var(--fill-tertiary)",
+                    color: "var(--text-tertiary)",
+                    border: "none",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <X size={10} />
+                </button>
+              )}
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) handleImageUpload(file)
+                e.target.value = ""
+              }}
+            />
+          </div>
           <div>
             <h1
               style={{

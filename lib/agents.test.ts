@@ -1,9 +1,10 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockReadFileSync, mockExistsSync, bundledAgents } = vi.hoisted(() => ({
+const { mockReadFileSync, mockExistsSync, mockReaddirSync, bundledAgents } = vi.hoisted(() => ({
   mockReadFileSync: vi.fn(),
   mockExistsSync: vi.fn(),
+  mockReaddirSync: vi.fn(),
   bundledAgents: [
     {
       id: 'jarvis',
@@ -110,7 +111,8 @@ const { mockReadFileSync, mockExistsSync, bundledAgents } = vi.hoisted(() => ({
 vi.mock('fs', () => ({
   readFileSync: mockReadFileSync,
   existsSync: mockExistsSync,
-  default: { readFileSync: mockReadFileSync, existsSync: mockExistsSync },
+  readdirSync: mockReaddirSync,
+  default: { readFileSync: mockReadFileSync, existsSync: mockExistsSync, readdirSync: mockReaddirSync },
 }))
 
 // Mock the bundled agents.json
@@ -124,12 +126,23 @@ import { getAgents, getAgent } from './agents'
 beforeEach(() => {
   vi.clearAllMocks()
   vi.unstubAllEnvs()
-  // Default: no SOUL files exist on disk
+  // Default: no files exist on disk, no directories
   mockExistsSync.mockReturnValue(false)
+  mockReaddirSync.mockReturnValue([])
 })
 
+/** Helper: block auto-discovery paths so bundled registry is used */
+function blockDiscovery(ws: string) {
+  return (p: string) => {
+    if (p === `${ws}/clawport/agents.json`) return false
+    if (p === `${ws}/SOUL.md`) return false
+    if (p === `${ws}/agents`) return false
+    return false
+  }
+}
+
 // ---------------------------------------------------------------------------
-// Registry loading: bundled fallback vs workspace override
+// Registry loading: bundled fallback vs workspace override vs auto-discovery
 // ---------------------------------------------------------------------------
 
 describe('agent registry loading', () => {
@@ -221,6 +234,171 @@ describe('agent registry loading', () => {
     const agents = await getAgents()
     expect(agents.length).toBe(bundledAgents.length)
   })
+
+  it('prioritizes user override over auto-discovery', async () => {
+    vi.stubEnv('WORKSPACE_PATH', '/tmp/ws')
+
+    const customAgents = [
+      { id: 'custom', name: 'Custom', title: 'Agent', reportsTo: null, directReports: [], soulPath: null, voiceId: null, color: '#ff0000', emoji: 'C', tools: ['read'], memoryPath: null, description: 'Custom.' },
+    ]
+
+    mockExistsSync.mockImplementation((p: string) => {
+      if (p === '/tmp/ws/clawport/agents.json') return true
+      // These would trigger discovery, but override takes priority
+      if (p === '/tmp/ws/SOUL.md') return true
+      if (p === '/tmp/ws/agents') return true
+      return false
+    })
+    mockReadFileSync.mockImplementation((p: string) => {
+      if (p === '/tmp/ws/clawport/agents.json') return JSON.stringify(customAgents)
+      throw new Error('ENOENT')
+    })
+
+    const agents = await getAgents()
+    expect(agents).toHaveLength(1)
+    expect(agents[0].id).toBe('custom')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Auto-discovery from workspace
+// ---------------------------------------------------------------------------
+
+describe('auto-discovery from workspace', () => {
+  it('discovers agents from workspace agents/ directory', async () => {
+    vi.stubEnv('WORKSPACE_PATH', '/tmp/ws')
+
+    mockExistsSync.mockImplementation((p: string) => {
+      if (p === '/tmp/ws/clawport/agents.json') return false
+      if (p === '/tmp/ws/SOUL.md') return true
+      if (p === '/tmp/ws/agents') return true
+      if (p === '/tmp/ws/agents/bot-a/SOUL.md') return true
+      if (p === '/tmp/ws/agents/bot-b/SOUL.md') return true
+      return false
+    })
+
+    mockReaddirSync.mockReturnValue([
+      { name: 'bot-a', isDirectory: () => true },
+      { name: 'bot-b', isDirectory: () => true },
+      { name: 'README.md', isDirectory: () => false },
+    ])
+
+    mockReadFileSync.mockImplementation((p: string) => {
+      if (p === '/tmp/ws/SOUL.md') return '# MyOrchestrator'
+      if (p === '/tmp/ws/agents/bot-a/SOUL.md') return '# Bot Alpha\nRole: Data Analyst'
+      if (p === '/tmp/ws/agents/bot-b/SOUL.md') return '# Bot Beta'
+      throw new Error('ENOENT')
+    })
+
+    const agents = await getAgents()
+    expect(agents).toHaveLength(3) // root + 2 agents
+
+    const root = agents.find(a => a.reportsTo === null)!
+    expect(root.name).toBe('MyOrchestrator')
+    expect(root.soulPath).toBe('SOUL.md')
+    expect(root.soul).toBe('# MyOrchestrator')
+    expect(root.directReports).toEqual(['bot-a', 'bot-b'])
+
+    const botA = agents.find(a => a.id === 'bot-a')!
+    expect(botA.name).toBe('Bot Alpha')
+    expect(botA.title).toBe('Data Analyst')
+    expect(botA.reportsTo).toBe(root.id)
+    expect(botA.soulPath).toBe('agents/bot-a/SOUL.md')
+    expect(botA.soul).toBe('# Bot Alpha\nRole: Data Analyst')
+
+    const botB = agents.find(a => a.id === 'bot-b')!
+    expect(botB.name).toBe('Bot Beta')
+    expect(botB.reportsTo).toBe(root.id)
+  })
+
+  it('discovers agents without root SOUL.md (flat structure)', async () => {
+    vi.stubEnv('WORKSPACE_PATH', '/tmp/ws')
+
+    mockExistsSync.mockImplementation((p: string) => {
+      if (p === '/tmp/ws/clawport/agents.json') return false
+      if (p === '/tmp/ws/SOUL.md') return false
+      if (p === '/tmp/ws/agents') return true
+      if (p === '/tmp/ws/agents/worker/SOUL.md') return true
+      return false
+    })
+
+    mockReaddirSync.mockReturnValue([
+      { name: 'worker', isDirectory: () => true },
+    ])
+
+    mockReadFileSync.mockImplementation((p: string) => {
+      if (p === '/tmp/ws/agents/worker/SOUL.md') return '# Worker Bot'
+      throw new Error('ENOENT')
+    })
+
+    const agents = await getAgents()
+    expect(agents).toHaveLength(1)
+    expect(agents[0].id).toBe('worker')
+    expect(agents[0].name).toBe('Worker Bot')
+    expect(agents[0].reportsTo).toBeNull()
+  })
+
+  it('falls back to bundled when no agents/ dir and no root SOUL.md', async () => {
+    vi.stubEnv('WORKSPACE_PATH', '/tmp/ws')
+    mockExistsSync.mockReturnValue(false)
+    const agents = await getAgents()
+    expect(agents.length).toBe(bundledAgents.length)
+  })
+
+  it('skips directories without SOUL.md', async () => {
+    vi.stubEnv('WORKSPACE_PATH', '/tmp/ws')
+
+    mockExistsSync.mockImplementation((p: string) => {
+      if (p === '/tmp/ws/clawport/agents.json') return false
+      if (p === '/tmp/ws/SOUL.md') return true
+      if (p === '/tmp/ws/agents') return true
+      if (p === '/tmp/ws/agents/valid/SOUL.md') return true
+      if (p === '/tmp/ws/agents/empty/SOUL.md') return false // no SOUL.md
+      return false
+    })
+
+    mockReaddirSync.mockReturnValue([
+      { name: 'valid', isDirectory: () => true },
+      { name: 'empty', isDirectory: () => true },
+    ])
+
+    mockReadFileSync.mockImplementation((p: string) => {
+      if (p === '/tmp/ws/SOUL.md') return '# Root'
+      if (p === '/tmp/ws/agents/valid/SOUL.md') return '# Valid Agent'
+      throw new Error('ENOENT')
+    })
+
+    const agents = await getAgents()
+    // root + 1 valid agent (empty skipped)
+    expect(agents).toHaveLength(2)
+    expect(agents.map(a => a.id)).not.toContain('empty')
+  })
+
+  it('uses directory name as fallback when SOUL.md has no heading', async () => {
+    vi.stubEnv('WORKSPACE_PATH', '/tmp/ws')
+
+    mockExistsSync.mockImplementation((p: string) => {
+      if (p === '/tmp/ws/clawport/agents.json') return false
+      if (p === '/tmp/ws/SOUL.md') return false
+      if (p === '/tmp/ws/agents') return true
+      if (p === '/tmp/ws/agents/my-bot/SOUL.md') return true
+      return false
+    })
+
+    mockReaddirSync.mockReturnValue([
+      { name: 'my-bot', isDirectory: () => true },
+    ])
+
+    mockReadFileSync.mockImplementation((p: string) => {
+      if (p === '/tmp/ws/agents/my-bot/SOUL.md') return 'No heading here, just text.'
+      throw new Error('ENOENT')
+    })
+
+    const agents = await getAgents()
+    expect(agents).toHaveLength(1)
+    expect(agents[0].id).toBe('my-bot')
+    expect(agents[0].name).toBe('My Bot') // slugToName
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -277,27 +455,32 @@ describe('getAgents', () => {
 
   it('reads soul content when soulPath file exists', async () => {
     vi.stubEnv('WORKSPACE_PATH', '/tmp/ws')
-    mockExistsSync.mockImplementation((path: string) => {
-      // Only the SOUL file exists, not the workspace override
-      if (path === '/tmp/ws/clawport/agents.json') return false
+    mockExistsSync.mockImplementation((p: string) => {
+      // Block auto-discovery, allow SOUL file reads for bundled agents
+      if (p === '/tmp/ws/clawport/agents.json') return false
+      if (p === '/tmp/ws/SOUL.md') return false
+      if (p === '/tmp/ws/agents') return false
       return true
     })
-    mockReadFileSync.mockReturnValue('# Jarvis SOUL')
+    mockReadFileSync.mockReturnValue('# Agent SOUL content')
     const agents = await getAgents()
-    const jarvis = agents.find(a => a.id === 'jarvis')!
-    expect(jarvis.soul).toBe('# Jarvis SOUL')
+    // vera has soulPath: 'agents/vera/SOUL.md' which won't conflict with discovery
+    const vera = agents.find(a => a.id === 'vera')!
+    expect(vera.soul).toBe('# Agent SOUL content')
   })
 
   it('sets soul to null when readFileSync throws', async () => {
     vi.stubEnv('WORKSPACE_PATH', '/tmp/ws')
-    mockExistsSync.mockImplementation((path: string) => {
-      if (path === '/tmp/ws/clawport/agents.json') return false
+    mockExistsSync.mockImplementation((p: string) => {
+      if (p === '/tmp/ws/clawport/agents.json') return false
+      if (p === '/tmp/ws/SOUL.md') return false
+      if (p === '/tmp/ws/agents') return false
       return true
     })
     mockReadFileSync.mockImplementation(() => { throw new Error('EACCES') })
     const agents = await getAgents()
-    const jarvis = agents.find(a => a.id === 'jarvis')!
-    expect(jarvis.soul).toBeNull()
+    const vera = agents.find(a => a.id === 'vera')!
+    expect(vera.soul).toBeNull()
   })
 
   it('initializes crons as empty array for every agent', async () => {

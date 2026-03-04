@@ -11,6 +11,23 @@ vi.mock('child_process', () => ({
   default: { execSync: mockExecSync },
 }))
 
+// Mock agents-registry so getCrons can resolve agent IDs without real fs
+vi.mock('@/lib/agents-registry', () => ({
+  loadRegistry: () => [
+    { id: 'pulse' },
+    { id: 'herald' },
+    { id: 'robin' },
+    { id: 'echo' },
+    { id: 'spark' },
+    { id: 'scribe' },
+    { id: 'kaze' },
+    { id: 'jarvis' },
+    { id: 'maven' },
+    { id: 'lumen' },
+    { id: 'seo-team' },
+  ],
+}))
+
 import { getCrons } from './crons'
 
 beforeEach(() => {
@@ -64,7 +81,7 @@ describe('getCrons - well-formed data', () => {
     const crons = await getCrons()
     expect(crons).toHaveLength(1)
     expect(crons[0].name).toBe('seo-team-weekly')
-    expect(crons[0].agentId).toBe('lumen')
+    expect(crons[0].agentId).toBe('seo-team')
   })
 
   it('parses a { data: [...] } wrapper', async () => {
@@ -86,7 +103,7 @@ describe('getCrons - well-formed data', () => {
     expect(crons[0].agentId).toBe('echo')
   })
 
-  it('maps multiple crons to correct agents', async () => {
+  it('maps multiple crons to correct agents via dynamic prefix matching', async () => {
     const mockData = [
       { id: '1', name: 'pulse-daily', schedule: '0 8 * * *', state: {} },
       { id: '2', name: 'herald-linkedin', schedule: '0 10 * * 1-5', state: {} },
@@ -94,10 +111,10 @@ describe('getCrons - well-formed data', () => {
       { id: '4', name: 'spark-discover', schedule: '0 12 */2 * *', state: {} },
       { id: '5', name: 'scribe-compress', schedule: '0 0 * * 0', state: {} },
       { id: '6', name: 'robin-recon', schedule: '0 6 * * 1', state: {} },
-      { id: '7', name: 'vault-backup', schedule: '0 3 * * *', state: {} },
+      { id: '7', name: 'jarvis-backup', schedule: '0 3 * * *', state: {} },
       { id: '8', name: 'maven-calendar', schedule: '0 9 * * 1', state: {} },
-      { id: '9', name: 'team-memory-sync', schedule: '0 23 * * *', state: {} },
-      { id: '10', name: 'mochi-feed', schedule: '0 11 * * *', state: {} },
+      { id: '9', name: 'scribe-memory-sync', schedule: '0 23 * * *', state: {} },
+      { id: '10', name: 'lumen-feed', schedule: '0 11 * * *', state: {} },
     ]
     mockExecSync.mockReturnValue(JSON.stringify(mockData))
 
@@ -113,10 +130,10 @@ describe('getCrons - well-formed data', () => {
     expect(agentMap['spark-discover']).toBe('spark')
     expect(agentMap['scribe-compress']).toBe('scribe')
     expect(agentMap['robin-recon']).toBe('robin')
-    expect(agentMap['vault-backup']).toBe('jarvis')
+    expect(agentMap['jarvis-backup']).toBe('jarvis')
     expect(agentMap['maven-calendar']).toBe('maven')
-    expect(agentMap['team-memory-sync']).toBe('scribe')
-    expect(agentMap['mochi-feed']).toBe('pulse')
+    expect(agentMap['scribe-memory-sync']).toBe('scribe')
+    expect(agentMap['lumen-feed']).toBe('lumen')
   })
 })
 
@@ -283,7 +300,7 @@ describe('getCrons - schedule object handling', () => {
   it('handles plain string schedule (no regression)', async () => {
     mockExecSync.mockReturnValue(JSON.stringify([{
       id: 'cron-str',
-      name: 'vault-backup',
+      name: 'jarvis-backup',
       schedule: '0 3 * * *',
       state: { status: 'ok' },
     }]))
@@ -447,7 +464,7 @@ describe('getCrons - actual data format with expr/tz and rich fields', () => {
   it('parses schedule with { kind: "cron", expr, tz }', async () => {
     mockExecSync.mockReturnValue(JSON.stringify([{
       id: '0b133350-ca33-42ae-a4b3-9b4d249e4a6b',
-      name: 'builder-briefing',
+      name: 'jarvis-briefing',
       description: 'Daily 6 AM wake-up message for John with image',
       enabled: true,
       schedule: { kind: 'cron', expr: '0 6 * * *', tz: 'America/Chicago' },
@@ -477,7 +494,7 @@ describe('getCrons - actual data format with expr/tz and rich fields', () => {
   it('handles delivery with missing to field', async () => {
     mockExecSync.mockReturnValue(JSON.stringify([{
       id: 'test',
-      name: 'vault-morning-snapshot',
+      name: 'jarvis-morning-snapshot',
       schedule: { kind: 'cron', expr: '0 5 * * *', tz: 'America/Chicago' },
       delivery: { mode: 'announce', channel: 'discord' },
       state: { lastRunStatus: 'error', consecutiveErrors: 3, lastDeliveryStatus: 'unknown' },
@@ -498,5 +515,44 @@ describe('getCrons - actual data format with expr/tz and rich fields', () => {
     }]))
     const crons = await getCrons()
     expect(crons[0].enabled).toBe(false)
+  })
+})
+
+// --- Dynamic agent matching ---
+
+describe('getCrons - dynamic agent matching', () => {
+  it('matches cron name to agent ID by prefix', async () => {
+    mockExecSync.mockReturnValue(JSON.stringify([
+      { id: '1', name: 'pulse-daily', schedule: '* * * * *', state: {} },
+      { id: '2', name: 'echo-scan', schedule: '* * * * *', state: {} },
+    ]))
+    const crons = await getCrons()
+    expect(crons[0].agentId).toBe('pulse')
+    expect(crons[1].agentId).toBe('echo')
+  })
+
+  it('matches longer agent ID first (seo-team before seo)', async () => {
+    // seo-team is in the mock registry, and should match before a hypothetical "seo" agent
+    mockExecSync.mockReturnValue(JSON.stringify([
+      { id: '1', name: 'seo-team-weekly', schedule: '* * * * *', state: {} },
+    ]))
+    const crons = await getCrons()
+    expect(crons[0].agentId).toBe('seo-team')
+  })
+
+  it('returns null for cron names that do not match any agent', async () => {
+    mockExecSync.mockReturnValue(JSON.stringify([
+      { id: '1', name: 'unknown-cron', schedule: '* * * * *', state: {} },
+    ]))
+    const crons = await getCrons()
+    expect(crons[0].agentId).toBeNull()
+  })
+
+  it('matches exact agent ID (no dash suffix needed)', async () => {
+    mockExecSync.mockReturnValue(JSON.stringify([
+      { id: '1', name: 'pulse', schedule: '* * * * *', state: {} },
+    ]))
+    const crons = await getCrons()
+    expect(crons[0].agentId).toBe('pulse')
   })
 })

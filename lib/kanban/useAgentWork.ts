@@ -5,6 +5,8 @@ import type { KanbanTicket, TicketStatus } from './types'
 import type { KanbanStore } from './store'
 import { executeWork, getWorkPrompt, persistWorkChat } from './automation'
 
+const MAX_CONCURRENT_WORK = 3
+
 interface UseAgentWorkOptions {
   tickets: KanbanStore
   onUpdateTicket: (ticketId: string, updates: Partial<KanbanTicket>) => void
@@ -12,10 +14,28 @@ interface UseAgentWorkOptions {
 
 export function useAgentWork({ tickets, onUpdateTicket }: UseAgentWorkOptions) {
   const activeWork = useRef<Set<string>>(new Set())
+  const abortControllers = useRef<Map<string, AbortController>>(new Map())
+  const unmounted = useRef(false)
+
+  // Clean up on unmount: abort all in-flight work
+  useEffect(() => {
+    unmounted.current = false
+    return () => {
+      unmounted.current = true
+      for (const [, controller] of abortControllers.current) {
+        controller.abort()
+      }
+      abortControllers.current.clear()
+      activeWork.current.clear()
+    }
+  }, [])
 
   const runWork = useCallback(async (ticket: KanbanTicket) => {
     const { id, assigneeId } = ticket
     if (!assigneeId) return
+
+    const controller = new AbortController()
+    abortControllers.current.set(id, controller)
 
     // Move to in-progress + set working state
     onUpdateTicket(id, {
@@ -25,7 +45,12 @@ export function useAgentWork({ tickets, onUpdateTicket }: UseAgentWorkOptions) {
       workError: null,
     })
 
-    const result = await executeWork(assigneeId, ticket)
+    const result = await executeWork(assigneeId, ticket, undefined, controller.signal)
+
+    // Bail if component unmounted while we were working
+    if (unmounted.current) return
+
+    abortControllers.current.delete(id)
 
     if (result.success) {
       // Save chat history so TicketDetailPanel picks it up
@@ -39,7 +64,6 @@ export function useAgentWork({ tickets, onUpdateTicket }: UseAgentWorkOptions) {
         workResult: result.content,
       })
     } else {
-      // Stay in-progress with error
       onUpdateTicket(id, {
         workState: 'failed',
         workError: result.error || 'Agent work failed',
@@ -57,6 +81,7 @@ export function useAgentWork({ tickets, onUpdateTicket }: UseAgentWorkOptions) {
 
     for (const ticket of eligible) {
       if (activeWork.current.has(ticket.id)) continue
+      if (activeWork.current.size >= MAX_CONCURRENT_WORK) break
 
       // Mark as active immediately to prevent double-execution
       activeWork.current.add(ticket.id)

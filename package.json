@@ -1,6 +1,6 @@
 {
   "name": "clawport-ui",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Open-source dashboard for managing, monitoring, and chatting with your OpenClaw AI agents.",
   "homepage": "https://clawport.dev",
   "repository": {
@@ -19,6 +19,22 @@
     "next.js"
   ],
   "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "app/",
+    "bin/",
+    "components/",
+    "docs/",
+    "lib/",
+    "public/",
+    "scripts/",
+    "next.config.mjs",
+    "postcss.config.mjs",
+    "tsconfig.json",
+    ".env.example"
+  ],
   "bin": {
     "clawport": "./bin/clawport.mjs"
   },
