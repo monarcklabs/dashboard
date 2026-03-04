@@ -12,10 +12,10 @@ import type { ThemeId } from '@/lib/themes'
 // ---------------------------------------------------------------------------
 
 const ACCENT_PRESETS = [
+  { label: 'Red', value: '#EF4444' },
   { label: 'Gold', value: '#F5C518' },
   { label: 'Blue', value: '#3B82F6' },
   { label: 'Green', value: '#22C55E' },
-  { label: 'Red', value: '#EF4444' },
   { label: 'Orange', value: '#F97316' },
   { label: 'Purple', value: '#A855F7' },
   { label: 'Pink', value: '#EC4899' },

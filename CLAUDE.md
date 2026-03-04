@@ -12,6 +12,8 @@ npx next build       # Production build
 
 ### CLI (global install)
 
+> The npm package is `clawport-ui`. The CLI command is `clawport`. The separate `clawport` npm package is unrelated.
+
 ```bash
 npm install -g clawport-ui
 clawport setup       # Auto-detect config, write .env.local into package dir

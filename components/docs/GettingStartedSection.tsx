@@ -42,8 +42,13 @@ export function GettingStartedSection() {
       />
 
       <SubHeading>Quick Start (npm)</SubHeading>
+      <Callout type="note">
+        The npm package is <InlineCode>clawport-ui</InlineCode>. The CLI command
+        is <InlineCode>clawport</InlineCode>. Do not install the unrelated{" "}
+        <InlineCode>clawport</InlineCode> package.
+      </Callout>
       <CodeBlock title="terminal">
-        {`# Install globally
+        {`# Install globally (package: clawport-ui, command: clawport)
 npm install -g clawport-ui
 
 # Run the setup wizard (auto-detects your OpenClaw config)

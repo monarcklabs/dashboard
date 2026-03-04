@@ -14,8 +14,11 @@ This guide walks you through getting ClawPort running against your own OpenClaw 
 
 ## 1. Install ClawPort
 
+> **Note:** The npm package is `clawport-ui`. The CLI command is `clawport`.
+> Do not install the unrelated `clawport` package.
+
 ```bash
-# Install globally from npm
+# Install globally (package: clawport-ui, command: clawport)
 npm install -g clawport-ui
 
 # Or clone the repo

@@ -16,8 +16,11 @@ ClawPort is an open-source dashboard for managing, monitoring, and talking direc
 
 ### Quick Start (npm)
 
+> **Note:** The npm package is `clawport-ui`. The CLI command is `clawport`.
+> Do not install the unrelated `clawport` package.
+
 ```bash
-# Install globally
+# Install globally (package: clawport-ui, command: clawport)
 npm install -g clawport-ui
 
 # Auto-detect your OpenClaw config
@@ -225,7 +228,7 @@ Five built-in themes, toggled via the sidebar button:
 
 | Theme | Description |
 |-------|-------------|
-| **Dark** | Apple Dark Mode with warm blacks, gold accent |
+| **Dark** | Apple Dark Mode with warm blacks, red accent |
 | **Glass** | Frosted translucent panels on deep blue-black |
 | **Color** | Vibrant purple-indigo gradients |
 | **Light** | Apple Light Mode, clean whites |
@@ -274,7 +277,7 @@ npm install -g clawport-ui
 clawport help
 ```
 
-Published as [`clawport-ui`](https://www.npmjs.com/package/clawport-ui) on npm.
+Published as [`clawport-ui`](https://www.npmjs.com/package/clawport-ui) on npm. The CLI command is `clawport` (not `clawport-ui`). The separate `clawport` npm package is unrelated and not affiliated with this project.
 
 ### CLI Commands
 
