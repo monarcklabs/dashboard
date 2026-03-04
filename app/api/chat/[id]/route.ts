@@ -129,10 +129,16 @@ export async function POST(
         Connection: 'keep-alive',
       },
     })
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('Chat API error:', err)
+
+    let userMessage = 'Chat failed. Make sure OpenClaw gateway is running.'
+    if (err instanceof Error && 'status' in err && (err as { status: number }).status === 405) {
+      userMessage = 'Gateway returned 405. Enable the HTTP endpoint: set gateway.http.endpoints.chatCompletions.enabled = true in ~/.openclaw/openclaw.json, then restart the gateway.'
+    }
+
     return new Response(
-      JSON.stringify({ error: 'Chat failed. Make sure OpenClaw gateway is running.' }),
+      JSON.stringify({ error: userMessage }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     )
   }

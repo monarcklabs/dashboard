@@ -115,7 +115,27 @@ If you skip this, everything works normally. Voice indicators just won't appear.
 
 ---
 
-## 3. Start the Gateway
+## 3. Enable the HTTP Endpoint
+
+ClawPort talks to the gateway's OpenAI-compatible HTTP endpoint, which is **disabled by default**. Running `clawport setup` or `npm run setup` will detect this and offer to enable it automatically.
+
+To enable it manually, open `~/.openclaw/openclaw.json` and add:
+
+```json
+{
+  "gateway": {
+    "http": {
+      "endpoints": {
+        "chatCompletions": { "enabled": true }
+      }
+    }
+  }
+}
+```
+
+Merge this into your existing config -- don't replace the whole file. If this isn't enabled, chat will fail with a **405 Method Not Allowed** error.
+
+## 4. Start the Gateway
 
 ClawPort expects the OpenClaw gateway to be running at `localhost:18789`. Start it in a separate terminal:
 
@@ -123,11 +143,11 @@ ClawPort expects the OpenClaw gateway to be running at `localhost:18789`. Start 
 openclaw gateway run
 ```
 
-Leave this running while you use ClawPort. If the gateway isn't running, chat and all AI features will fail with connection errors.
+Restart the gateway after changing `openclaw.json`. Leave it running while you use ClawPort. If the gateway isn't running, chat and all AI features will fail with connection errors.
 
 ---
 
-## 4. Run ClawPort
+## 5. Run ClawPort
 
 ```bash
 # If installed globally via npm
@@ -153,7 +173,7 @@ All of these can be changed later in the Settings page. The wizard just gets you
 
 ---
 
-## 5. Agent Customization
+## 6. Agent Customization
 
 ### Auto-Discovery (Default)
 
@@ -274,7 +294,7 @@ Your `agents.json` should be an array of agent objects. Here's the minimal requi
 
 ---
 
-## 6. Production Build
+## 7. Production Build
 
 ```bash
 # If installed globally via npm
@@ -334,6 +354,22 @@ cp .env.example .env.local
 ```
 
 Then fill in the values. Restart the dev server after changing `.env.local`.
+
+### 405 Method Not Allowed when chatting
+
+The gateway's HTTP chat completions endpoint is disabled. Enable it in `~/.openclaw/openclaw.json`:
+
+```json
+"gateway": {
+  "http": {
+    "endpoints": {
+      "chatCompletions": { "enabled": true }
+    }
+  }
+}
+```
+
+Restart the gateway after changing the config. You can also re-run `clawport setup` which will detect and fix this automatically.
 
 ### Gateway connection refused / chat not working
 

@@ -64,6 +64,34 @@ function detectGatewayToken() {
   }
 }
 
+function checkHttpEndpointEnabled() {
+  const configPath = join(homedir(), '.openclaw', 'openclaw.json')
+  if (!existsSync(configPath)) return null // can't check
+  try {
+    const config = JSON.parse(readFileSync(configPath, 'utf-8'))
+    return config?.gateway?.http?.endpoints?.chatCompletions?.enabled === true
+  } catch {
+    return null
+  }
+}
+
+function enableHttpEndpoint() {
+  const configPath = join(homedir(), '.openclaw', 'openclaw.json')
+  if (!existsSync(configPath)) return false
+  try {
+    const config = JSON.parse(readFileSync(configPath, 'utf-8'))
+    if (!config.gateway) config.gateway = {}
+    if (!config.gateway.http) config.gateway.http = {}
+    if (!config.gateway.http.endpoints) config.gateway.http.endpoints = {}
+    if (!config.gateway.http.endpoints.chatCompletions) config.gateway.http.endpoints.chatCompletions = {}
+    config.gateway.http.endpoints.chatCompletions.enabled = true
+    writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf-8')
+    return true
+  } catch {
+    return false
+  }
+}
+
 async function checkGatewayRunning() {
   try {
     const res = await fetch('http://127.0.0.1:18789/', {
@@ -122,6 +150,24 @@ async function main() {
   } else {
     console.log(`  ${yellow('!')} Gateway not responding at localhost:18789`)
     console.log(`    ${dim('Start it with: openclaw gateway run')}`)
+  }
+
+  // Check HTTP chat completions endpoint
+  const httpEnabled = checkHttpEndpointEnabled()
+  if (httpEnabled === true) {
+    console.log(`  ${green('+')} HTTP chat completions endpoint ${dim('enabled')}`)
+  } else if (httpEnabled === false) {
+    console.log(`  ${yellow('!')} HTTP chat completions endpoint is ${bold('disabled')}`)
+    console.log(`    ${dim('ClawPort needs this to chat with agents.')}`)
+    const enable = await ask(`  ${yellow('?')} Enable it in openclaw.json? (Y/n) `)
+    if (enable.toLowerCase() !== 'n') {
+      if (enableHttpEndpoint()) {
+        console.log(`  ${green('+')} Enabled! ${dim('Restart the gateway for this to take effect.')}`)
+      } else {
+        console.log(`  ${red('x')} Could not update openclaw.json. Enable it manually:`)
+        console.log(`    ${dim('Set gateway.http.endpoints.chatCompletions.enabled = true in ~/.openclaw/openclaw.json')}`)
+      }
+    }
   }
   console.log()
 
