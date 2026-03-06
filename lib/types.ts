@@ -31,6 +31,81 @@ export interface CronRun {
   error: string | null
   durationMs: number
   deliveryStatus: string | null
+  model: string | null
+  provider: string | null
+  usage: { input_tokens: number; output_tokens: number; total_tokens: number } | null
+}
+
+// ── Cost Dashboard Types ──────────────────────────────────────
+
+export interface ModelPricing {
+  inputPer1M: number
+  outputPer1M: number
+}
+
+export interface RunCost {
+  ts: number
+  jobId: string
+  model: string
+  provider: string
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+  cacheTokens: number
+  minCost: number
+}
+
+export interface JobCostSummary {
+  jobId: string
+  runs: number
+  totalInputTokens: number
+  totalOutputTokens: number
+  totalCacheTokens: number
+  totalCost: number
+  medianCost: number
+}
+
+export interface DailyCost {
+  date: string
+  cost: number
+  runs: number
+}
+
+export interface ModelBreakdown {
+  model: string
+  tokens: number
+  pct: number
+}
+
+export interface TokenAnomaly {
+  ts: number
+  jobId: string
+  totalTokens: number
+  medianTokens: number
+  ratio: number
+}
+
+export interface WeekOverWeek {
+  thisWeek: number
+  lastWeek: number
+  changePct: number | null
+}
+
+export interface CacheSavings {
+  cacheTokens: number
+  estimatedSavings: number
+}
+
+export interface CostSummary {
+  totalCost: number
+  topSpender: { jobId: string; cost: number } | null
+  anomalies: TokenAnomaly[]
+  jobCosts: JobCostSummary[]
+  dailyCosts: DailyCost[]
+  modelBreakdown: ModelBreakdown[]
+  runCosts: RunCost[]
+  weekOverWeek: WeekOverWeek
+  cacheSavings: CacheSavings
 }
 
 export interface CronJob {
@@ -161,4 +236,5 @@ export interface LiveLogLine {
   time: string
   level: string
   message: string
+  raw?: string
 }

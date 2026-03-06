@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { LogEntry, LogFilter, LogSummary } from '@/lib/types'
 import { Skeleton } from '@/components/ui/skeleton'
-import { RefreshCw, Radio, Search } from 'lucide-react'
+import { RefreshCw, Radio } from 'lucide-react'
 import { ErrorState } from '@/components/ErrorState'
 import { LogBrowser } from '@/components/activity/LogBrowser'
-import { ActivityFeed } from '@/components/activity/ActivityFeed'
 
 /* ── Time helpers ──────────────────────────────────────────────── */
 
@@ -22,15 +21,6 @@ function timeAgo(dateStr: string): string {
   if (hrs < 24) return `${hrs}h ago`
   return `${days}d ago`
 }
-
-/* ── Types ─────────────────────────────────────────────────────── */
-
-type Tab = 'feed' | 'browser'
-
-const TABS: { key: Tab; label: string; icon: React.ComponentType<{ size: number }> }[] = [
-  { key: 'feed', label: 'Feed', icon: Radio },
-  { key: 'browser', label: 'Browser', icon: Search },
-]
 
 /* ── Summary Cards ─────────────────────────────────────────────── */
 
@@ -111,7 +101,6 @@ export default function ActivityPage() {
   const [entries, setEntries] = useState<LogEntry[]>([])
   const [summary, setSummary] = useState<LogSummary | null>(null)
   const [filter, setFilter] = useState<LogFilter>('all')
-  const [tab, setTab] = useState<Tab>('browser')
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -194,6 +183,27 @@ export default function ActivityPage() {
             )}
           </div>
           <div className="flex items-center" style={{ gap: 'var(--space-3)' }}>
+            {/* Open Live Stream */}
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('clawport:open-stream-widget'))}
+              className="focus-ring flex items-center"
+              style={{
+                padding: '6px 14px',
+                borderRadius: 'var(--radius-sm)',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 'var(--text-footnote)',
+                fontWeight: 'var(--weight-semibold)',
+                gap: 6,
+                background: 'var(--accent-fill)',
+                color: 'var(--accent)',
+                transition: 'all 200ms var(--ease-smooth)',
+              }}
+            >
+              <Radio size={14} />
+              Open Live Stream
+            </button>
+
             <span style={{ fontSize: 'var(--text-caption1)', color: 'var(--text-tertiary)' }}>
               Updated {updatedAgo}
             </span>
@@ -218,38 +228,6 @@ export default function ActivityPage() {
               <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
             </button>
           </div>
-        </div>
-
-        {/* ── Tab navigation ─────────────────────────────────── */}
-        <div className="flex items-center" style={{ padding: '0 var(--space-6) var(--space-3)', gap: 'var(--space-1)' }}>
-          {TABS.map(t => {
-            const isActive = tab === t.key
-            const TabIcon = t.icon
-            return (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className="focus-ring"
-                style={{
-                  padding: '6px 16px',
-                  fontSize: 'var(--text-footnote)',
-                  fontWeight: isActive ? 'var(--weight-semibold)' : 'var(--weight-medium)',
-                  border: 'none',
-                  borderRadius: 'var(--radius-sm)',
-                  cursor: 'pointer',
-                  transition: 'all 200ms var(--ease-smooth)',
-                  background: isActive ? 'var(--accent-fill)' : 'transparent',
-                  color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-              >
-                <TabIcon size={14} />
-                {t.label}
-              </button>
-            )
-          })}
         </div>
       </header>
 
@@ -285,22 +263,14 @@ export default function ActivityPage() {
               <SourcesCard cron={summary?.sources.cron ?? 0} config={summary?.sources.config ?? 0} />
             </div>
 
-            {/* Tab content */}
-            {tab === 'feed' && (
-              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                <ActivityFeed active={tab === 'feed'} />
-              </div>
-            )}
-
-            {tab === 'browser' && (
-              <LogBrowser
-                entries={entries}
-                summary={summary}
-                loading={false}
-                filter={filter}
-                onFilterChange={setFilter}
-              />
-            )}
+            {/* Log browser */}
+            <LogBrowser
+              entries={entries}
+              summary={summary}
+              loading={false}
+              filter={filter}
+              onFilterChange={setFilter}
+            />
           </>
         )}
       </div>
