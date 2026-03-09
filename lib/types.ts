@@ -36,6 +36,13 @@ export interface CronRun {
   usage: { input_tokens: number; output_tokens: number; total_tokens: number } | null
 }
 
+// ── Claude Code Usage Types ───────────────────────────────────
+
+export interface ClaudeCodeUsage {
+  fiveHour: { utilization: number; resetsAt: string | null }
+  sevenDay: { utilization: number; resetsAt: string | null }
+}
+
 // ── Cost Dashboard Types ──────────────────────────────────────
 
 export interface ModelPricing {

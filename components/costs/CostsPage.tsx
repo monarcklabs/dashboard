@@ -1,9 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Agent, CostSummary, CronJob, RunCost, OptimizationInsight } from '@/lib/types'
+import type { Agent, CostSummary, CronJob, RunCost, OptimizationInsight, ClaudeCodeUsage } from '@/lib/types'
 import { Skeleton } from '@/components/ui/skeleton'
-import { AlertTriangle, TrendingDown, TrendingUp, Activity, Zap, MessageSquare, ChevronDown } from 'lucide-react'
+import { AlertTriangle, TrendingDown, TrendingUp, Activity, Zap, MessageSquare, ChevronDown, Cpu, ChevronUp } from 'lucide-react'
 import { generateId } from '@/lib/id'
 import { buildCostAnalysisPrompt } from '@/lib/costs'
 import { renderMarkdown } from '@/lib/sanitize'
@@ -35,11 +35,12 @@ function fmtDuration(ms: number): string {
 
 function SummaryCard({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div style={{
+    <div className="summary-card" style={{
       background: 'var(--material-regular)',
       border: '1px solid var(--separator)',
       borderRadius: 'var(--radius-md)',
       padding: 'var(--space-4)',
+      transition: 'transform 150ms ease, box-shadow 150ms ease',
     }}>
       <div style={{ fontSize: 'var(--text-caption1)', color: 'var(--text-tertiary)', fontWeight: 'var(--weight-medium)', marginBottom: 'var(--space-1)' }}>
         {label}
@@ -76,6 +77,7 @@ function DailyCostChart({ dailyCosts }: { dailyCosts: CostSummary['dailyCosts'] 
       border: '1px solid var(--separator)',
       borderRadius: 'var(--radius-md)',
       padding: 'var(--space-4)',
+      boxShadow: '0 0 0 0.5px var(--separator)',
     }}>
       <div style={{
         fontSize: 'var(--text-caption1)',
@@ -192,6 +194,7 @@ function TokenDonut({ data }: { data: CostSummary }) {
       border: '1px solid var(--separator)',
       borderRadius: 'var(--radius-md)',
       padding: 'var(--space-4)',
+      boxShadow: '0 0 0 0.5px var(--separator)',
     }}>
       <div style={{
         fontSize: 'var(--text-caption1)',
@@ -496,6 +499,133 @@ function InsightCard({ insight, onAction }: { insight: OptimizationInsight; onAc
   )
 }
 
+/* ── Usage Ring (inverted: higher = more used = red) ─────────── */
+
+function UsageRing({ pct, size = 56 }: { pct: number; size?: number }) {
+  const r = (size - 6) / 2
+  const circumference = 2 * Math.PI * r
+  const offset = circumference - (pct / 100) * circumference
+  const color = pct >= 80 ? 'var(--system-red)' : pct >= 50 ? 'var(--system-orange)' : 'var(--system-green)'
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--fill-tertiary)" strokeWidth={4} />
+      <circle
+        cx={size / 2} cy={size / 2} r={r} fill="none"
+        stroke={color} strokeWidth={4}
+        strokeDasharray={circumference} strokeDashoffset={offset}
+        strokeLinecap="round" transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        style={{ transition: 'stroke-dashoffset 600ms ease' }}
+      />
+      <text x={size / 2} y={size / 2 + 1} textAnchor="middle" dominantBaseline="central"
+        fill="var(--text-primary)" fontSize={size > 40 ? 13 : 10} fontWeight="700"
+        style={{ fontVariantNumeric: 'tabular-nums' }}
+      >{Math.round(pct)}%</text>
+    </svg>
+  )
+}
+
+/* ── Countdown formatter ─────────────────────────────────────── */
+
+function useCountdown(resetsAt: string | null): string {
+  const [now, setNow] = useState(Date.now())
+
+  useEffect(() => {
+    if (!resetsAt) return
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [resetsAt])
+
+  if (!resetsAt) return '--'
+  const diff = new Date(resetsAt).getTime() - now
+  if (diff <= 0) return 'now'
+  const h = Math.floor(diff / 3_600_000)
+  const m = Math.floor((diff % 3_600_000) / 60_000)
+  if (h > 0) return `${h}h ${m}m`
+  const s = Math.floor((diff % 60_000) / 1000)
+  return `${m}m ${s}s`
+}
+
+/* ── Claude Code Usage Row ────────────────────────────────────── */
+
+function ClaudeUsageRow({ usage }: { usage: ClaudeCodeUsage }) {
+  const fiveHourCountdown = useCountdown(usage.fiveHour.resetsAt)
+  const sevenDayCountdown = useCountdown(usage.sevenDay.resetsAt)
+
+  return (
+    <div style={{ marginBottom: 'var(--space-4)' }}>
+      <div className="flex items-center" style={{
+        gap: 6, fontSize: 'var(--text-caption1)', color: 'var(--text-tertiary)',
+        fontWeight: 'var(--weight-medium)', marginBottom: 'var(--space-3)',
+      }}>
+        <Cpu size={12} />
+        Claude Code Usage
+      </div>
+      <div className="usage-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+        {/* 5-Hour Window */}
+        <div style={{
+          background: 'var(--material-regular)',
+          border: '1px solid var(--separator)',
+          borderRadius: 'var(--radius-md)',
+          padding: 'var(--space-4)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--space-4)',
+        }}>
+          <UsageRing pct={usage.fiveHour.utilization} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="flex items-center" style={{ gap: 6 }}>
+              <span style={{ fontSize: 'var(--text-footnote)', fontWeight: 600, color: 'var(--text-primary)' }}>
+                5-Hour Window
+              </span>
+              {usage.fiveHour.utilization >= 80 && (
+                <span className="usage-pulse" style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: 'var(--system-red)',
+                  animation: 'pulse 1.2s infinite',
+                }} />
+              )}
+            </div>
+            <div style={{ fontSize: 'var(--text-caption1)', color: 'var(--text-tertiary)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
+              Resets in {fiveHourCountdown}
+            </div>
+          </div>
+        </div>
+
+        {/* Weekly Cap */}
+        <div style={{
+          background: 'var(--material-regular)',
+          border: '1px solid var(--separator)',
+          borderRadius: 'var(--radius-md)',
+          padding: 'var(--space-4)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--space-4)',
+        }}>
+          <UsageRing pct={usage.sevenDay.utilization} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="flex items-center" style={{ gap: 6 }}>
+              <span style={{ fontSize: 'var(--text-footnote)', fontWeight: 600, color: 'var(--text-primary)' }}>
+                Weekly Cap
+              </span>
+              {usage.sevenDay.utilization >= 80 && (
+                <span className="usage-pulse" style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: 'var(--system-red)',
+                  animation: 'pulse 1.2s infinite',
+                }} />
+              )}
+            </div>
+            <div style={{ fontSize: 'var(--text-caption1)', color: 'var(--text-tertiary)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
+              Resets in {sevenDayCountdown}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ── Chat message type ───────────────────────────────────────── */
 
 interface CostChatMessage {
@@ -524,6 +654,12 @@ export function CostsPage() {
   const [chatMessages, setChatMessages] = useState<CostChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
   const [chatStreaming, setChatStreaming] = useState(false)
+
+  // Claude Code usage state
+  const [claudeUsage, setClaudeUsage] = useState<ClaudeCodeUsage | null>(null)
+
+  // Insights collapse
+  const [insightsExpanded, setInsightsExpanded] = useState(false)
 
   const rootAgent = useMemo(
     () => agents.find(a => a.reportsTo === null) || agents[0] || null,
@@ -562,6 +698,21 @@ export function CostsPage() {
         setError(err instanceof Error ? err.message : 'Unknown error')
         setLoading(false)
       })
+  }, [])
+
+  // Claude Code usage SSE stream
+  useEffect(() => {
+    const es = new EventSource('/api/usage/stream')
+    es.onmessage = (event) => {
+      try {
+        const parsed = JSON.parse(event.data)
+        if (parsed.type === 'usage') {
+          setClaudeUsage(parsed.data ?? null)
+        }
+      } catch { /* skip */ }
+    }
+    es.onerror = () => { setClaudeUsage(null) }
+    return () => es.close()
   }, [])
 
   // Auto-scroll analysis
@@ -827,6 +978,9 @@ export function CostsPage() {
               </div>
             )}
 
+            {/* ── Claude Code Usage ──────────────────────────────── */}
+            {claudeUsage && <ClaudeUsageRow usage={claudeUsage} />}
+
             {/* ── Summary cards (4-col) ──────────────────────────── */}
             <div className="costs-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
               {/* Total Estimated Cost */}
@@ -969,9 +1123,36 @@ export function CostsPage() {
                     All clear -- no optimization issues detected
                   </div>
                 ) : (
-                  data.insights.map(insight => (
-                    <InsightCard key={insight.id} insight={insight} onAction={handleInsightAction} />
-                  ))
+                  <>
+                    {(insightsExpanded ? data.insights : data.insights.slice(0, 2)).map(insight => (
+                      <div key={insight.id} style={{ opacity: 1, transition: 'opacity 150ms ease' }}>
+                        <InsightCard insight={insight} onAction={handleInsightAction} />
+                      </div>
+                    ))}
+                    {data.insights.length > 2 && (
+                      <button
+                        onClick={() => setInsightsExpanded(prev => !prev)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          padding: '6px 0',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: 'var(--text-caption1)',
+                          fontWeight: 'var(--weight-medium)',
+                          color: 'var(--accent)',
+                        }}
+                      >
+                        {insightsExpanded ? (
+                          <><ChevronUp size={12} /> Show less</>
+                        ) : (
+                          <><ChevronDown size={12} /> Show all {data.insights.length} insights</>
+                        )}
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -1062,7 +1243,7 @@ export function CostsPage() {
                       className="markdown-body"
                       style={{
                         padding: 'var(--space-4)',
-                        maxHeight: 400,
+                        maxHeight: 480,
                         overflowY: 'auto',
                         fontSize: 'var(--text-footnote)',
                         lineHeight: 1.6,
@@ -1293,6 +1474,10 @@ export function CostsPage() {
         @keyframes blink {
           50% { opacity: 0; }
         }
+        .summary-card:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
         @media (max-width: 768px) {
           .costs-summary-grid {
             grid-template-columns: repeat(2, 1fr) !important;
@@ -1304,6 +1489,9 @@ export function CostsPage() {
             grid-template-columns: 1fr !important;
           }
           .opt-row {
+            grid-template-columns: 1fr !important;
+          }
+          .usage-row {
             grid-template-columns: 1fr !important;
           }
         }
