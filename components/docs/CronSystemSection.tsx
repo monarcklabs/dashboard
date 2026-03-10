@@ -14,7 +14,7 @@ export function CronSystemSection() {
     <>
       <Heading>Cron System</Heading>
       <Paragraph>
-        ClawPort provides a full cron monitoring dashboard with three views:
+        Monarck provides a full cron monitoring dashboard with three views:
         overview (health donut, attention cards, error banners), weekly schedule
         (7-day calendar grid), and pipeline graph (React Flow dependency
         visualization). Data is fetched from the OpenClaw CLI and auto-refreshes

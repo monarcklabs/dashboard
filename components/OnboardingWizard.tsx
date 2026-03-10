@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Map, MessageSquare, Columns3, Clock, Brain, Mic, Check, Keyboard, AlertCircle, Loader2, CheckCircle2, XCircle, ArrowLeft, ArrowRight, Rocket, RotateCcw } from 'lucide-react'
 import { useSettings } from '@/app/settings-provider'
 import { useTheme } from '@/app/providers'
+import { APP_NAME } from '@/lib/branding'
 import { THEMES } from '@/lib/themes'
 import type { ThemeId } from '@/lib/themes'
 
@@ -271,7 +272,7 @@ export function OnboardingWizard({ forceOpen, onClose }: OnboardingWizardProps) 
                 color: 'var(--text-primary)',
                 marginBottom: 'var(--space-2)',
               }}>
-                Welcome to ClawPort
+                Welcome to {APP_NAME}
               </h2>
               <p style={{
                 fontSize: 'var(--text-body)',
@@ -600,7 +601,7 @@ export function OnboardingWizard({ forceOpen, onClose }: OnboardingWizardProps) 
                   <input
                     type="text"
                     className="apple-input"
-                    placeholder="ClawPort"
+                    placeholder={APP_NAME}
                     value={localName}
                     onChange={e => setLocalName(e.target.value)}
                     autoFocus
@@ -681,7 +682,7 @@ export function OnboardingWizard({ forceOpen, onClose }: OnboardingWizardProps) 
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                     }}>
-                      {localName || 'ClawPort'}
+                      {localName || APP_NAME}
                     </div>
                     <div style={{
                       fontSize: 'var(--text-caption2)',

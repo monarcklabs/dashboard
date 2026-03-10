@@ -15,14 +15,14 @@ export function AgentsSection() {
     <>
       <Heading>Agents</Heading>
       <Paragraph>
-        ClawPort automatically discovers your agents from your OpenClaw
+        Monarck automatically discovers your agents from your OpenClaw
         workspace. No configuration is needed -- if you have agents in your
-        workspace, ClawPort will find and display them.
+        workspace, Monarck will find and display them.
       </Paragraph>
 
       <SubHeading>Auto-Discovery (Default)</SubHeading>
       <Paragraph>
-        ClawPort scans <InlineCode>$WORKSPACE_PATH/agents/</InlineCode> for
+        Monarck scans <InlineCode>$WORKSPACE_PATH/agents/</InlineCode> for
         subdirectories containing a <InlineCode>SOUL.md</InlineCode> file. Each
         becomes an agent with:
       </Paragraph>
@@ -59,7 +59,7 @@ export function AgentsSection() {
       </Paragraph>
       <CodeBlock>{`$WORKSPACE_PATH/clawport/agents.json`}</CodeBlock>
       <Paragraph>
-        ClawPort checks for this file on every request. If it exists, it
+        Monarck checks for this file on every request. If it exists, it
         replaces auto-discovery entirely. If it's missing or contains invalid
         JSON, auto-discovery is used instead.
       </Paragraph>

@@ -13,6 +13,7 @@ import {
   Settings,
 } from 'lucide-react';
 import type { Agent, CronJob } from '@/lib/types';
+import { APP_NAME, CLIENT_HIDDEN_NAV_PATHS, isMonarckProductionHost } from '@/lib/branding';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -110,6 +111,7 @@ export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
+  const [isClientFacingHost, setIsClientFacingHost] = useState<boolean | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [crons, setCrons] = useState<CronJob[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -119,6 +121,10 @@ export function GlobalSearch() {
   // -----------------------------------------------------------------------
   // Keyboard shortcut: Cmd+K / Ctrl+K
   // -----------------------------------------------------------------------
+  useEffect(() => {
+    setIsClientFacingHost(isMonarckProductionHost(window.location.hostname));
+  }, []);
+
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -146,6 +152,7 @@ export function GlobalSearch() {
   // -----------------------------------------------------------------------
   useEffect(() => {
     if (!open) return;
+    if (isClientFacingHost === null) return;
     // Reset state
     setQuery('');
     setActiveIndex(0);
@@ -160,16 +167,20 @@ export function GlobalSearch() {
       })
       .catch(() => setAgents([]));
     // Fetch crons
-    fetch('/api/crons')
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((data: unknown) => {
-        setCrons(Array.isArray(data) ? data as CronJob[] : (data as { crons?: CronJob[] })?.crons ?? []);
-      })
-      .catch(() => setCrons([]));
-  }, [open]);
+    if (!isClientFacingHost) {
+      fetch('/api/crons')
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        })
+        .then((data: unknown) => {
+          setCrons(Array.isArray(data) ? data as CronJob[] : (data as { crons?: CronJob[] })?.crons ?? []);
+        })
+        .catch(() => setCrons([]));
+    } else {
+      setCrons([]);
+    }
+  }, [open, isClientFacingHost]);
 
   // -----------------------------------------------------------------------
   // Focus input when opened
@@ -216,19 +227,24 @@ export function GlobalSearch() {
     });
 
     // Static pages
-    all.push(...STATIC_PAGES);
+    all.push(
+      ...STATIC_PAGES.filter((page) => (
+        isClientFacingHost === false || !CLIENT_HIDDEN_NAV_PATHS.includes(page.href as typeof CLIENT_HIDDEN_NAV_PATHS[number])
+      ))
+    );
 
-    // Crons
-    crons.forEach((c) => {
-      all.push({
-        id: `cron-${c.id}`,
-        label: c.name,
-        subtitle: c.schedule,
-        icon: <Timer size={16} />,
-        href: '/crons',
-        category: 'Crons',
+    if (!isClientFacingHost) {
+      crons.forEach((c) => {
+        all.push({
+          id: `cron-${c.id}`,
+          label: c.name,
+          subtitle: c.schedule,
+          icon: <Timer size={16} />,
+          href: '/crons',
+          category: 'Crons',
+        });
       });
-    });
+    }
 
     if (!query.trim()) return all;
 
@@ -237,7 +253,7 @@ export function GlobalSearch() {
         fuzzyMatch(query, r.label) ||
         (r.subtitle && fuzzyMatch(query, r.subtitle))
     );
-  }, [query, agents, crons]);
+  }, [query, agents, crons, isClientFacingHost]);
 
   // -----------------------------------------------------------------------
   // Group results by category
@@ -346,7 +362,7 @@ export function GlobalSearch() {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Search ClawPort"
+        aria-label={`Search ${APP_NAME}`}
         className="animate-scale-in"
         onKeyDown={handleKeyDown}
         style={{
@@ -386,8 +402,8 @@ export function GlobalSearch() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search ClawPort..."
-            aria-label="Search ClawPort"
+            placeholder={`Search ${APP_NAME}...`}
+            aria-label={`Search ${APP_NAME}`}
             style={{
               flex: 1,
               background: 'transparent',

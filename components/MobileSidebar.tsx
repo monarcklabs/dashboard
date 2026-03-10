@@ -6,7 +6,7 @@ import { Menu, X } from 'lucide-react';
 import { NavLinks } from '@/components/NavLinks';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { SearchTrigger } from '@/components/GlobalSearch';
-import { useSettings } from '@/app/settings-provider';
+import { MonarckMark } from '@/components/MonarckMark';
 import { SidebarUsageWidget } from '@/components/sidebar/SidebarUsageWidget';
 
 export function MobileSidebar({
@@ -16,7 +16,6 @@ export function MobileSidebar({
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const { settings } = useSettings();
 
   // Close sidebar on route change
   useEffect(() => {
@@ -95,45 +94,11 @@ export function MobileSidebar({
           {open ? <X size={20} /> : <Menu size={20} />}
         </button>
 
-        {/* App title */}
+        {/* Brand mark */}
         <div className="flex items-center gap-2" style={{ flex: 1 }}>
-          {settings.portalIcon ? (
-            <img
-              src={settings.portalIcon}
-              alt=""
-              style={{
-                width: '24px',
-                height: '24px',
-                borderRadius: '6px',
-                objectFit: 'cover',
-                flexShrink: 0,
-              }}
-            />
-          ) : (
-            <img
-              src="/clawport-logo.png"
-              alt=""
-              style={{
-                width: '48px',
-                height: '48px',
-                objectFit: 'contain',
-                flexShrink: 0,
-              }}
-            />
-          )}
-          <span
-            style={{
-              fontSize: '15px',
-              fontWeight: 600,
-              color: 'var(--text-primary)',
-              letterSpacing: '-0.2px',
-            }}
-          >
-            {(!settings.portalName || settings.portalName === 'ClawPort')
-              ? <>Claw<span style={{ color: 'var(--accent)' }}>Port</span></>
-              : settings.portalName}
-            {' '}{settings.portalSubtitle ?? 'Command Centre'}
-          </span>
+          <div aria-label="Monarck">
+            <MonarckMark size={24} />
+          </div>
         </div>
       </header>
 
@@ -175,57 +140,14 @@ export function MobileSidebar({
         }}
         aria-hidden={!open}
       >
-        {/* App icon + title */}
+        {/* Brand mark */}
         <div className="px-4 pt-5 pb-3">
-          <div className="flex items-center gap-3">
-            {settings.portalIcon ? (
-              <img
-                src={settings.portalIcon}
-                alt=""
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '10px',
-                  objectFit: 'cover',
-                  boxShadow: 'var(--shadow-card)',
-                  flexShrink: 0,
-                }}
-              />
-            ) : (
-              <img
-                src="/clawport-logo.png"
-                alt=""
-                style={{
-                  width: '72px',
-                  height: '72px',
-                  objectFit: 'contain',
-                  flexShrink: 0,
-                }}
-              />
-            )}
-            <div>
-              <div
-                style={{
-                  fontSize: '17px',
-                  fontWeight: 600,
-                  letterSpacing: '-0.3px',
-                  color: 'var(--text-primary)',
-                }}
-              >
-                {(!settings.portalName || settings.portalName === 'ClawPort')
-                  ? <>Claw<span style={{ color: 'var(--accent)' }}>Port</span></>
-                  : settings.portalName}
-              </div>
-              <div
-                style={{
-                  fontSize: '12px',
-                  color: 'var(--text-secondary)',
-                  letterSpacing: '0.01em',
-                }}
-              >
-                {settings.portalSubtitle ?? 'Command Centre'}
-              </div>
-            </div>
+          <div
+            className="flex items-center"
+            aria-label="Monarck"
+            style={{ minHeight: '36px' }}
+          >
+            <MonarckMark size={32} />
           </div>
         </div>
 

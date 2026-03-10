@@ -4,6 +4,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import type { Agent } from '@/lib/types'
 import { AgentList, AgentListMobile } from '@/components/chat/AgentList'
 import { ConversationView } from '@/components/chat/ConversationView'
+import { APP_NAME } from '@/lib/branding'
 import {
   loadConversations, saveConversations, getOrCreateConversation,
   markRead, type ConversationStore
@@ -170,7 +171,7 @@ function EmptyState() {
         color: 'var(--text-primary)',
         letterSpacing: '-0.3px',
       }}>
-        ClawPort Messages
+        {APP_NAME} Messages
       </div>
       <div style={{
         fontSize: 'var(--text-subheadline)',

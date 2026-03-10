@@ -15,8 +15,8 @@ export function GettingStartedSection() {
     <>
       <Heading>Getting Started</Heading>
       <Paragraph>
-        This guide walks you through getting ClawPort running against your own
-        OpenClaw instance. ClawPort is a Next.js 16 dashboard for managing,
+        This guide walks you through getting Monarck running against your own
+        OpenClaw instance. Monarck is a Next.js 16 dashboard for managing,
         monitoring, and talking directly to your OpenClaw AI agents.
       </Paragraph>
 
@@ -35,7 +35,7 @@ export function GettingStartedSection() {
             <strong style={{ color: "var(--text-primary)" }}>
               OpenClaw gateway running
             </strong>{" "}
-            -- ClawPort talks to the gateway at{" "}
+            -- Monarck talks to the gateway at{" "}
             <InlineCode>localhost:18789</InlineCode> by default (configurable via{" "}
             <InlineCode>OPENCLAW_GATEWAY_PORT</InlineCode>)
           </>,
@@ -159,7 +159,7 @@ npm run dev`}
 
       <SubHeading>Start the Gateway</SubHeading>
       <Paragraph>
-        ClawPort expects the OpenClaw gateway running at{" "}
+        Monarck expects the OpenClaw gateway running at{" "}
         <InlineCode>localhost:18789</InlineCode> (or your custom port). Start it in a separate terminal:
       </Paragraph>
       <CodeBlock>{`openclaw gateway run`}</CodeBlock>
@@ -172,7 +172,7 @@ npm run dev`}
 
       <SubHeading>First-Run Onboarding</SubHeading>
       <Paragraph>
-        On your first visit, ClawPort launches the onboarding wizard (5 steps):
+        On your first visit, Monarck launches the onboarding wizard (5 steps):
       </Paragraph>
       <NumberedList
         items={[

@@ -6,6 +6,7 @@ import type { Agent } from '@/lib/types'
 import { useSettings } from '@/app/settings-provider'
 import { AgentAvatar } from '@/components/AgentAvatar'
 import { OnboardingWizard } from '@/components/OnboardingWizard'
+import { APP_NAME } from '@/lib/branding'
 
 // ---------------------------------------------------------------------------
 // Accent color presets
@@ -291,7 +292,7 @@ export default function SettingsPage() {
               <input
                 type="text"
                 className="apple-input"
-                placeholder="ClawPort"
+                placeholder={APP_NAME}
                 value={nameValue}
                 onChange={(e) => setNameValue(e.target.value)}
                 onBlur={() => setPortalName(nameValue || null)}

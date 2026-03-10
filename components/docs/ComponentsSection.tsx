@@ -14,7 +14,7 @@ export function ComponentsSection() {
     <>
       <Heading>Components</Heading>
       <Paragraph>
-        ClawPort's component tree follows the standard Next.js App Router
+        Monarck's component tree follows the standard Next.js App Router
         pattern: providers wrap the entire app, layout components handle the
         sidebar and navigation, and each route renders its own page component.
       </Paragraph>

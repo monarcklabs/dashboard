@@ -7,6 +7,7 @@ import { Map, MessageSquare, Clock, Activity, Brain, Columns3, BookOpen, Setting
 import type { LucideIcon } from 'lucide-react';
 import type { CronJob } from '@/lib/types';
 import { useSettings } from '@/app/settings-provider';
+import { CLIENT_HIDDEN_NAV_PATHS, isMonarckProductionHost } from '@/lib/branding';
 
 function getInitials(name: string | null): string {
   if (!name) return '??'
@@ -45,9 +46,14 @@ const NAV_ITEMS: NavItem[] = [
 export function NavLinks({ bottomSlot }: { bottomSlot?: React.ReactNode } = {}) {
   const pathname = usePathname();
   const { settings } = useSettings();
+  const [isClientFacingHost, setIsClientFacingHost] = useState<boolean | null>(null);
   const [agentCount, setAgentCount] = useState<number | null>(null);
   const [cronCount, setCronCount] = useState<number | null>(null);
   const [cronErrorCount, setCronErrorCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    setIsClientFacingHost(isMonarckProductionHost(window.location.hostname));
+  }, []);
 
   // Fetch agent count
   useEffect(() => {
@@ -68,6 +74,12 @@ export function NavLinks({ bottomSlot }: { bottomSlot?: React.ReactNode } = {}) 
 
   // Fetch cron error count
   useEffect(() => {
+    if (isClientFacingHost === null) return;
+    if (isClientFacingHost) {
+      setCronCount(null);
+      setCronErrorCount(null);
+      return;
+    }
     fetch('/api/crons')
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -83,7 +95,7 @@ export function NavLinks({ bottomSlot }: { bottomSlot?: React.ReactNode } = {}) 
       .catch(() => {
         setCronErrorCount(null);
       });
-  }, []);
+  }, [isClientFacingHost]);
 
   // Resolve badge content per nav item
   function getBadge(item: NavItem): React.ReactNode {
@@ -171,7 +183,10 @@ export function NavLinks({ bottomSlot }: { bottomSlot?: React.ReactNode } = {}) 
         </div>
 
         <div className="flex flex-col gap-0.5">
-          {NAV_ITEMS.map((item) => {
+          {NAV_ITEMS.filter((item) => {
+            if (isClientFacingHost === false) return true;
+            return !CLIENT_HIDDEN_NAV_PATHS.includes(item.href as typeof CLIENT_HIDDEN_NAV_PATHS[number]);
+          }).map((item) => {
             const isActive =
               item.href === '/'
                 ? pathname === '/'

@@ -15,7 +15,7 @@ export function ArchitectureSection() {
     <>
       <Heading>Architecture</Heading>
       <Paragraph>
-        ClawPort is a Next.js 16 dashboard for managing OpenClaw AI agents. It
+        Monarck is a Next.js 16 dashboard for managing OpenClaw AI agents. It
         provides an org chart (Org Map), direct agent chat with multimodal
         support, cron monitoring, kanban task board, and memory browsing. All AI
         calls route through the OpenClaw gateway -- no separate API keys needed.
@@ -133,7 +133,7 @@ export function ArchitectureSection() {
   kanban/page.tsx       -- Task board
   crons/page.tsx        -- Cron job monitor
   memory/page.tsx       -- Memory file browser
-  settings/page.tsx     -- ClawPort personalization
+  settings/page.tsx     -- Monarck personalization
   docs/page.tsx         -- Documentation browser
   api/
     agents/route.ts     -- GET agents from registry

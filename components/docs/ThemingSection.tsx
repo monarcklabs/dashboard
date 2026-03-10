@@ -16,7 +16,7 @@ export function ThemingSection() {
     <>
       <Heading>Theming</Heading>
       <Paragraph>
-        ClawPort's visual theming is driven entirely by CSS custom properties
+        Monarck's visual theming is driven entirely by CSS custom properties
         and two React context providers: ThemeProvider and SettingsProvider.
         Five built-in themes are toggled via the sidebar theme picker.
       </Paragraph>

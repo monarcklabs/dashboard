@@ -14,7 +14,7 @@ export function TroubleshootingSection() {
     <>
       <Heading>Troubleshooting</Heading>
       <Paragraph>
-        Common issues and their solutions when running ClawPort.
+        Common issues and their solutions when running Monarck.
       </Paragraph>
 
       {/* ── npm install permission errors ──────────────────────── */}
@@ -126,7 +126,7 @@ npm install -g clawport-ui`}
         You should get a JSON response. If you changed your gateway port, replace{" "}
         <InlineCode>18789</InlineCode> with your custom port. Set{" "}
         <InlineCode>OPENCLAW_GATEWAY_PORT</InlineCode> in your{" "}
-        <InlineCode>.env.local</InlineCode> so ClawPort connects to the right port.
+        <InlineCode>.env.local</InlineCode> so Monarck connects to the right port.
       </Paragraph>
 
       {/* ── Issue 3 ────────────────────────────────────────────── */}
@@ -153,7 +153,7 @@ npm install -g clawport-ui`}
             <strong style={{ color: "var(--text-primary)" }}>
               Check the server console
             </strong>{" "}
-            -- ClawPort logs errors to the terminal where{" "}
+            -- Monarck logs errors to the terminal where{" "}
             <InlineCode>npm run dev</InlineCode> is running.
           </>,
         ]}
@@ -171,7 +171,7 @@ npm install -g clawport-ui`}
         The <InlineCode>soulPath</InlineCode> in your agents.json is relative to{" "}
         <InlineCode>WORKSPACE_PATH</InlineCode>. If your workspace is at{" "}
         <InlineCode>/Users/you/.openclaw/workspace</InlineCode> and soulPath is{" "}
-        <InlineCode>"agents/vera/SOUL.md"</InlineCode>, ClawPort will look for{" "}
+        <InlineCode>"agents/vera/SOUL.md"</InlineCode>, Monarck will look for{" "}
         <InlineCode>
           /Users/you/.openclaw/workspace/agents/vera/SOUL.md
         </InlineCode>
@@ -204,7 +204,7 @@ npm install -g clawport-ui`}
             <strong style={{ color: "var(--text-primary)" }}>
               Image too large
             </strong>{" "}
-            -- ClawPort resizes to 1200px max, but extremely large images may
+            -- Monarck resizes to 1200px max, but extremely large images may
             still hit limits. Try a smaller image.
           </>,
         ]}

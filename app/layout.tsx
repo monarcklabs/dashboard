@@ -6,10 +6,11 @@ import { Sidebar } from '@/components/Sidebar';
 import { DynamicFavicon } from '@/components/DynamicFavicon';
 import { OnboardingWizard } from '@/components/OnboardingWizard';
 import { LiveStreamWidget } from '@/components/LiveStreamWidget';
+import { APP_NAME } from '@/lib/branding';
 
 export const metadata: Metadata = {
-  title: 'ClawPort -- Command Centre',
-  description: 'AI Agent Management Dashboard',
+  title: `${APP_NAME} -- Command Centre`,
+  description: `${APP_NAME} AI Agent Management Dashboard`,
 };
 
 export default function RootLayout({
