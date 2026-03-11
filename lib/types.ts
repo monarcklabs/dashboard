@@ -225,6 +225,32 @@ export interface MemoryStats {
   dailyTimeline: Array<{ date: string; sizeBytes: number } | null>
 }
 
+export interface IntegrationItem {
+  id: string
+  enabled: boolean | null
+  summary: string[]
+}
+
+export interface IntegrationBindingSummary {
+  agentId: string
+  channel: string
+  peer: string
+}
+
+export interface IntegrationsSummary {
+  workspacePath: string | null
+  configPath: string | null
+  openclawBin: string | null
+  gatewayPort: number | null
+  httpEndpointEnabled: boolean | null
+  channels: IntegrationItem[]
+  tools: IntegrationItem[]
+  plugins: IntegrationItem[]
+  skills: IntegrationItem[]
+  bindings: IntegrationBindingSummary[]
+  configFound: boolean
+}
+
 export interface MemoryApiResponse {
   files: MemoryFileInfo[]
   config: MemoryConfig

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Map, MessageSquare, Clock, Activity, Brain, Columns3, BookOpen, Settings, DollarSign } from 'lucide-react';
+import { Map, MessageSquare, Clock, Activity, Brain, Columns3, BookOpen, Settings, DollarSign, PlugZap } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { CronJob } from '@/lib/types';
 import { useSettings } from '@/app/settings-provider';
@@ -33,6 +33,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/chat', label: 'Messages', icon: MessageSquare, badge: 'unread' },
   { href: '/crons', label: 'Crons', icon: Clock, badge: 'errors' },
   { href: '/activity', label: 'Activity', icon: Activity },
+  { href: '/integrations', label: 'Integrations', icon: PlugZap },
   { href: '/costs', label: 'Costs', icon: DollarSign },
   { href: '/memory', label: 'Memory', icon: Brain },
   { href: '/docs', label: 'Docs', icon: BookOpen },

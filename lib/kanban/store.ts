@@ -1,5 +1,3 @@
-'use client'
-
 import type { KanbanTicket, TicketStatus, TicketPriority, WorkState } from './types'
 import { generateId } from '../id'
 
@@ -37,31 +35,47 @@ function sanitizeTicket(id: string, raw: Record<string, unknown>): KanbanTicket 
   }
 }
 
+export function sanitizeStore(raw: unknown): KanbanStore {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const parsed = raw as Record<string, Record<string, unknown>>
+  const store: KanbanStore = {}
+
+  for (const id of Object.keys(parsed)) {
+    const ticket = sanitizeTicket(id, parsed[id])
+    if (!ticket) continue
+
+    if (ticket.workState === 'working' || ticket.workState === 'starting') {
+      ticket.status = 'todo'
+      ticket.workState = 'idle'
+      ticket.workStartedAt = null
+      ticket.workError = null
+    }
+
+    store[id] = ticket
+  }
+
+  return store
+}
+
+export function mergeTicketStores(base: KanbanStore, incoming: KanbanStore): KanbanStore {
+  const merged: KanbanStore = { ...base }
+
+  for (const [id, ticket] of Object.entries(incoming)) {
+    const existing = merged[id]
+    if (!existing || ticket.updatedAt >= existing.updatedAt) {
+      merged[id] = ticket
+    }
+  }
+
+  return merged
+}
+
 export function loadTickets(): KanbanStore {
   if (typeof window === 'undefined') return {}
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return {}
-    const parsed = JSON.parse(raw) as Record<string, Record<string, unknown>>
-    const store: KanbanStore = {}
-
-    for (const id of Object.keys(parsed)) {
-      const ticket = sanitizeTicket(id, parsed[id])
-      if (!ticket) continue // Skip corrupted entries
-
-      // Recover tickets stuck mid-work (e.g. page reload during streaming).
-      // Reset them to todo/idle so auto-work can re-trigger.
-      if (ticket.workState === 'working' || ticket.workState === 'starting') {
-        ticket.status = 'todo'
-        ticket.workState = 'idle'
-        ticket.workStartedAt = null
-        ticket.workError = null
-      }
-
-      store[id] = ticket
-    }
-
-    return store
+    return sanitizeStore(JSON.parse(raw))
   } catch {
     return {}
   }

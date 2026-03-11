@@ -10,6 +10,7 @@ import {
   updateTicket,
   moveTicket,
   deleteTicket,
+  mergeTicketStores,
   type KanbanStore,
 } from '@/lib/kanban/store'
 import { useAgentWork } from '@/lib/kanban/useAgentWork'
@@ -29,22 +30,49 @@ export default function KanbanPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [selectedTicket, setSelectedTicket] = useState<KanbanTicket | null>(null)
   const [filterAgentId, setFilterAgentId] = useState<string | null>(null)
+  const [hydrated, setHydrated] = useState(false)
 
   const loadData = useCallback(() => {
     setLoading(true)
     setError(null)
 
-    // Load tickets from localStorage
-    const stored = loadTickets()
-    setTickets(stored)
+    const localTickets = loadTickets()
 
-    // Load agents from API
-    fetch('/api/agents')
-      .then((r) => {
+    Promise.all([
+      fetch('/api/agents').then((r) => {
         if (!r.ok) throw new Error('Failed to fetch agents')
-        return r.json()
+        return r.json() as Promise<Agent[]>
+      }),
+      fetch('/api/kanban/tickets')
+        .then((r) => {
+          if (!r.ok) throw new Error('Failed to fetch kanban tickets')
+          return r.json() as Promise<KanbanStore>
+        })
+        .catch(() => ({} as KanbanStore)),
+    ])
+      .then(async ([a, remoteTickets]) => {
+        setAgents(a)
+        const merged = mergeTicketStores(remoteTickets, localTickets)
+        setTickets(merged)
+        saveTickets(merged)
+        setHydrated(true)
+
+        const localJson = JSON.stringify(localTickets)
+        const mergedJson = JSON.stringify(merged)
+        if (mergedJson !== JSON.stringify(remoteTickets) && mergedJson !== localJson) {
+          await fetch('/api/kanban/tickets', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: mergedJson,
+          }).catch(() => {})
+        } else if (mergedJson !== JSON.stringify(remoteTickets) && Object.keys(localTickets).length > 0) {
+          await fetch('/api/kanban/tickets', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: mergedJson,
+          }).catch(() => {})
+        }
       })
-      .then((a: Agent[]) => setAgents(a))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
@@ -55,10 +83,37 @@ export default function KanbanPage() {
 
   // Persist tickets whenever they change
   useEffect(() => {
-    if (!loading) {
+    if (!loading && hydrated) {
       saveTickets(tickets)
+      fetch('/api/kanban/tickets', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tickets),
+      }).catch(() => {})
     }
-  }, [tickets, loading])
+  }, [tickets, loading, hydrated])
+
+  useEffect(() => {
+    if (!hydrated) return
+
+    const interval = window.setInterval(() => {
+      fetch('/api/kanban/tickets')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((remote: KanbanStore | null) => {
+          if (!remote) return
+          setTickets((prev) => {
+            const prevJson = JSON.stringify(prev)
+            const remoteJson = JSON.stringify(remote)
+            if (prevJson === remoteJson) return prev
+            saveTickets(remote)
+            return remote
+          })
+        })
+        .catch(() => {})
+    }, 10000)
+
+    return () => window.clearInterval(interval)
+  }, [hydrated])
 
   // Keep selectedTicket in sync with store
   useEffect(() => {

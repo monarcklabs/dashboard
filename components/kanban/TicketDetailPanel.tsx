@@ -280,9 +280,9 @@ export function TicketDetailPanel({
     closeRef.current?.focus()
   }, [])
 
-  const openWorkDocument = useCallback(() => {
-    if (!ticket.workResult) return
-    const blob = new Blob([ticket.workResult], { type: 'text/markdown;charset=utf-8' })
+  const openMarkdownDocument = useCallback((content: string) => {
+    if (!content) return
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const opened = window.open(url, '_blank', 'noopener,noreferrer')
     if (!opened) {
@@ -293,7 +293,7 @@ export function TicketDetailPanel({
       a.click()
     }
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
-  }, [ticket.workResult])
+  }, [])
 
   /* ── Send message + stream response ─────────────── */
 
@@ -651,23 +651,6 @@ export function TicketDetailPanel({
                   Agent Work
                 </div>
                 <div style={{ display: 'flex', gap: 'var(--space-1)', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                  <button
-                    type="button"
-                    onClick={openWorkDocument}
-                    className="focus-ring"
-                    style={{
-                      fontSize: 'var(--text-caption2)',
-                      fontWeight: 600,
-                      padding: '3px var(--space-2)',
-                      borderRadius: 'var(--radius-sm)',
-                      border: '1px solid var(--separator)',
-                      background: 'var(--fill-secondary)',
-                      color: 'var(--text-secondary)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Open .md
-                  </button>
                 </div>
               </div>
               <div style={{
@@ -834,6 +817,26 @@ export function TicketDetailPanel({
                         }} />
                       )}
                     </div>
+                    {msg.role === 'assistant' && !msg.isStreaming && msg.content.trim().length > 200 && (
+                      <button
+                        type="button"
+                        onClick={() => openMarkdownDocument(msg.content)}
+                        className="focus-ring"
+                        style={{
+                          marginTop: 'var(--space-1)',
+                          fontSize: 'var(--text-caption2)',
+                          fontWeight: 600,
+                          padding: '3px var(--space-2)',
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--separator)',
+                          background: 'var(--fill-secondary)',
+                          color: 'var(--text-secondary)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Open .md
+                      </button>
+                    )}
                   </div>
                 ))}
                 <div ref={messagesEndRef} />
