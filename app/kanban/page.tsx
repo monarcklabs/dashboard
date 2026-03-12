@@ -356,11 +356,15 @@ export default function KanbanPage() {
         </div>
       </div>
 
-      {/* Mobile backdrop */}
+      {/* Detail backdrop */}
       {selectedTicket && (
         <div
-          className="fixed inset-0 z-30 md:hidden"
-          style={{ background: 'rgba(0,0,0,0.5)' }}
+          className="fixed inset-0 z-30"
+          style={{
+            background: 'rgba(8, 12, 20, 0.28)',
+            backdropFilter: 'blur(10px) saturate(140%)',
+            WebkitBackdropFilter: 'blur(10px) saturate(140%)',
+          }}
           onClick={() => setSelectedTicket(null)}
         />
       )}
