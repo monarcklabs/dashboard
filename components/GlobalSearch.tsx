@@ -229,7 +229,7 @@ export function GlobalSearch() {
     // Static pages
     all.push(
       ...STATIC_PAGES.filter((page) => (
-        isClientFacingHost === false || !CLIENT_HIDDEN_NAV_PATHS.includes(page.href as typeof CLIENT_HIDDEN_NAV_PATHS[number])
+        !CLIENT_HIDDEN_NAV_PATHS.includes(page.href as typeof CLIENT_HIDDEN_NAV_PATHS[number])
       ))
     );
 

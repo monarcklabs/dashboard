@@ -168,26 +168,6 @@ function PriorityBadge({ priority }: { priority: TicketPriority }) {
   )
 }
 
-/* ── Status badge ────────────────────────────────────── */
-
-function StatusBadge({ status }: { status: TicketStatus }) {
-  const label = COLUMNS.find(c => c.id === status)?.title ?? status
-  return (
-    <span style={{
-      fontSize: 'var(--text-caption2)',
-      fontWeight: 600,
-      color: 'var(--text-secondary)',
-      background: 'var(--fill-tertiary)',
-      padding: '2px var(--space-2)',
-      borderRadius: 'var(--radius-sm)',
-      textTransform: 'uppercase',
-      letterSpacing: '0.3px',
-    }}>
-      {label}
-    </span>
-  )
-}
-
 /* ── Main component ──────────────────────────────────── */
 
 interface TicketDetailPanelProps {
@@ -491,7 +471,7 @@ export function TicketDetailPanel({
         <div style={{ height: 3, background: accentColor, flexShrink: 0 }} />
 
         {/* Scrollable top section */}
-        <div style={{ flex: '0 0 auto', overflowY: 'auto', maxHeight: ticket.workResult ? '55%' : '45%' }}>
+        <div style={{ flex: '0 0 auto', overflowY: 'auto', maxHeight: ticket.workResult ? '48%' : '36%' }}>
           {/* Panel controls */}
           <div style={{
             padding: 'var(--space-4) var(--space-5) 0',
@@ -561,8 +541,51 @@ export function TicketDetailPanel({
               alignItems: 'center',
               gap: 'var(--space-3)',
               marginTop: 'var(--space-2)',
+              flexWrap: 'wrap',
             }}>
-              <StatusBadge status={ticket.status} />
+              <label style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                <select
+                  value={ticket.status}
+                  onChange={(e) => onStatusChange(e.target.value as TicketStatus)}
+                  className="focus-ring"
+                  aria-label="Ticket status"
+                  style={{
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none',
+                    fontSize: 'var(--text-caption2)',
+                    fontWeight: 700,
+                    color: accentColor,
+                    background: 'var(--accent-fill)',
+                    border: `1px solid color-mix(in srgb, ${accentColor} 35%, transparent)`,
+                    padding: '5px 28px 5px var(--space-2)',
+                    borderRadius: 'var(--radius-sm)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.3px',
+                    cursor: 'pointer',
+                    outline: 'none',
+                  }}
+                >
+                  {COLUMNS.map((col) => (
+                    <option key={col.id} value={col.id}>
+                      {col.title}
+                    </option>
+                  ))}
+                </select>
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    right: 10,
+                    pointerEvents: 'none',
+                    color: accentColor,
+                    fontSize: 10,
+                    lineHeight: 1,
+                  }}
+                >
+                  ▼
+                </span>
+              </label>
               <PriorityBadge priority={ticket.priority} />
             </div>
 
@@ -594,49 +617,6 @@ export function TicketDetailPanel({
                 Unassigned
               </div>
             )}
-          </div>
-
-          {/* Status controls */}
-          <div style={{
-            padding: '0 var(--space-5) var(--space-4)',
-          }}>
-            <div style={{
-              fontSize: 'var(--text-caption1)',
-              fontWeight: 600,
-              color: 'var(--text-tertiary)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              marginBottom: 'var(--space-2)',
-            }}>
-              Move to
-            </div>
-            <div style={{ display: 'flex', gap: 'var(--space-1)', flexWrap: 'wrap' }}>
-              {COLUMNS.map(col => {
-                const isCurrent = col.id === ticket.status
-                return (
-                  <button
-                    key={col.id}
-                    onClick={() => { if (!isCurrent) onStatusChange(col.id) }}
-                    disabled={isCurrent}
-                    className="focus-ring"
-                    style={{
-                      fontSize: 'var(--text-caption2)',
-                      fontWeight: 600,
-                      padding: '3px var(--space-2)',
-                      borderRadius: 'var(--radius-sm)',
-                      border: 'none',
-                      cursor: isCurrent ? 'default' : 'pointer',
-                      background: isCurrent ? accentColor : 'var(--fill-tertiary)',
-                      color: isCurrent ? '#fff' : 'var(--text-secondary)',
-                      opacity: isCurrent ? 1 : 0.8,
-                      transition: 'all 120ms ease',
-                    }}
-                  >
-                    {col.title}
-                  </button>
-                )
-              })}
-            </div>
           </div>
 
           {/* Description */}
@@ -864,16 +844,18 @@ export function TicketDetailPanel({
                         type="button"
                         onClick={() => openMarkdownDocument(msg.content)}
                         className="focus-ring"
-                        style={{
+                      style={{
                           marginTop: 'var(--space-1)',
                           fontSize: 'var(--text-caption2)',
                           fontWeight: 600,
-                          padding: '3px var(--space-2)',
-                          borderRadius: 'var(--radius-sm)',
-                          border: '1px solid var(--separator)',
-                          background: 'var(--fill-secondary)',
-                          color: 'var(--text-secondary)',
+                          padding: '6px 10px',
+                          borderRadius: 'var(--radius-md)',
+                          border: 'none',
+                          background: accentColor,
+                          color: '#fff',
                           cursor: 'pointer',
+                          boxShadow: `0 6px 16px color-mix(in srgb, ${accentColor} 25%, transparent)`,
+                          transition: 'all 120ms ease',
                         }}
                       >
                         Open .md

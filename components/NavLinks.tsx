@@ -185,7 +185,6 @@ export function NavLinks({ bottomSlot }: { bottomSlot?: React.ReactNode } = {}) 
 
         <div className="flex flex-col gap-0.5">
           {NAV_ITEMS.filter((item) => {
-            if (isClientFacingHost === false) return true;
             return !CLIENT_HIDDEN_NAV_PATHS.includes(item.href as typeof CLIENT_HIDDEN_NAV_PATHS[number]);
           }).map((item) => {
             const isActive =
