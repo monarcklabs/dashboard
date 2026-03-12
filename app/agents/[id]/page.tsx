@@ -490,6 +490,22 @@ export default function AgentDetailPage({
             >
               {agent.title}
             </p>
+            {agent.model && (
+              <span
+                style={{
+                  display: "inline-block",
+                  marginTop: "var(--space-1)",
+                  fontSize: "var(--text-caption2)",
+                  fontFamily: "var(--font-mono)",
+                  color: "var(--text-tertiary)",
+                  background: "var(--fill-secondary)",
+                  padding: "1px 8px",
+                  borderRadius: 6,
+                }}
+              >
+                {agent.model.split("/").pop()}
+              </span>
+            )}
             {/* Color swatch */}
             <div
               style={{

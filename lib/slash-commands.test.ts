@@ -22,6 +22,7 @@ function makeAgent(overrides: Partial<Agent> = {}): Agent {
     emoji: '🤖',
     tools: [],
     crons: [],
+    model: null,
     memoryPath: null,
     description: 'A test agent for unit tests.',
     ...overrides,

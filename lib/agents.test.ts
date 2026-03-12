@@ -18,6 +18,7 @@ const { mockReadFileSync, mockExistsSync, mockReaddirSync, mockExecSync, bundled
       color: '#f5c518',
       emoji: 'R',
       tools: ['exec', 'read', 'write'],
+      model: null,
       memoryPath: null,
       description: 'Top-level orchestrator.',
     },
@@ -32,6 +33,7 @@ const { mockReadFileSync, mockExistsSync, mockReaddirSync, mockExecSync, bundled
       color: '#a855f7',
       emoji: 'P',
       tools: ['web_search', 'read'],
+      model: null,
       memoryPath: null,
       description: 'CSO. Decides what gets built.',
     },
@@ -46,6 +48,7 @@ const { mockReadFileSync, mockExistsSync, mockReaddirSync, mockExecSync, bundled
       color: '#3b82f6',
       emoji: 'E',
       tools: ['web_search'],
+      model: null,
       memoryPath: null,
       description: 'Field operator.',
     },
@@ -60,6 +63,7 @@ const { mockReadFileSync, mockExistsSync, mockReaddirSync, mockExecSync, bundled
       color: '#22c55e',
       emoji: 'L',
       tools: ['web_search', 'read'],
+      model: null,
       memoryPath: null,
       description: 'SEO Team Director.',
     },
@@ -74,6 +78,7 @@ const { mockReadFileSync, mockExistsSync, mockReaddirSync, mockExecSync, bundled
       color: '#86efac',
       emoji: 'S',
       tools: ['web_search'],
+      model: null,
       memoryPath: null,
       description: 'Scouts trending topics.',
     },
@@ -88,6 +93,7 @@ const { mockReadFileSync, mockExistsSync, mockReaddirSync, mockExecSync, bundled
       color: '#eab308',
       emoji: 'W',
       tools: ['web_search'],
+      model: null,
       memoryPath: null,
       description: 'Hype radar.',
     },
@@ -102,6 +108,7 @@ const { mockReadFileSync, mockExistsSync, mockReaddirSync, mockExecSync, bundled
       color: '#60a5fa',
       emoji: 'A',
       tools: ['web_fetch'],
+      model: null,
       memoryPath: null,
       description: 'Monitors flights.',
     },
@@ -1115,6 +1122,7 @@ describe('CLI agent discovery (multi-workspace)', () => {
     id: string
     identityName?: string
     identityEmoji?: string
+    model?: string
     workspace?: string
     isDefault?: boolean
   }>) {
@@ -1125,7 +1133,7 @@ describe('CLI agent discovery (multi-workspace)', () => {
       identitySource: 'identity',
       workspace: e.workspace ?? '/tmp/ws',
       agentDir: `/home/.openclaw/agents/${e.id}/agent`,
-      model: 'anthropic/claude-sonnet-4-6',
+      model: e.model ?? 'anthropic/claude-sonnet-4-6',
       bindings: 0,
       isDefault: e.isDefault ?? false,
       routes: ['default (no explicit rules)'],
@@ -1249,6 +1257,51 @@ describe('CLI agent discovery (multi-workspace)', () => {
     expect(emptyBot!.emoji).toBe('🤷')
     expect(emptyBot!.reportsTo).toBeNull()
     expect(emptyBot!.tools).toEqual(['read', 'write'])
+  })
+
+  it('flows CLI model through to minimal entry', async () => {
+    setupPrimaryWorkspace()
+
+    const origExists = mockExistsSync.getMockImplementation()!
+    mockExistsSync.mockImplementation((p: string) => {
+      if (p.startsWith('/tmp/ws-model')) return false
+      return origExists(p)
+    })
+
+    mockExecSync.mockReturnValue(cliOutput([
+      { id: 'main', workspace: '/tmp/ws', isDefault: true },
+      { id: 'opus-bot', identityName: 'OpusBot', model: 'anthropic/claude-opus-4-6', workspace: '/tmp/ws-model' },
+    ]))
+
+    const agents = await getAgents()
+    const opusBot = agents.find(a => a.id === 'opus-bot')
+    expect(opusBot).toBeDefined()
+    expect(opusBot!.model).toBe('anthropic/claude-opus-4-6')
+  })
+
+  it('enriches primary workspace agents with CLI model', async () => {
+    setupPrimaryWorkspace()
+    mockExecSync.mockReturnValue(cliOutput([
+      { id: 'main', identityName: 'Jarvis', model: 'anthropic/claude-opus-4-6', workspace: '/tmp/ws', isDefault: true },
+    ]))
+
+    const agents = await getAgents()
+    const jarvis = agents.find(a => a.id === 'jarvis')
+    expect(jarvis).toBeDefined()
+    expect(jarvis!.model).toBe('anthropic/claude-opus-4-6')
+    // Sub-agents in the same workspace also get the model
+    const echo = agents.find(a => a.id === 'echo')
+    expect(echo!.model).toBe('anthropic/claude-opus-4-6')
+  })
+
+  it('agents stay model: null when CLI is unavailable', async () => {
+    setupPrimaryWorkspace()
+    mockExecSync.mockImplementation(() => { throw new Error('not found') })
+
+    const agents = await getAgents()
+    const jarvis = agents.find(a => a.id === 'jarvis')
+    expect(jarvis).toBeDefined()
+    expect(jarvis!.model).toBeNull()
   })
 
   it('does not duplicate agents already found in primary workspace', async () => {

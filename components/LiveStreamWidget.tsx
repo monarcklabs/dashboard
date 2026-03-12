@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { LiveLogLine } from '@/lib/types'
 import { parseSSEBuffer } from '@/lib/sse'
-import { Play, Pause, Copy, Minimize2, Search, ChevronRight } from 'lucide-react'
+import { Play, Pause, Copy, Minimize2, Search, ChevronRight, GripHorizontal } from 'lucide-react'
+import { useSettings } from '@/app/settings-provider'
 
 /* ── Constants ────────────────────────────────────────────────── */
 
@@ -126,6 +127,94 @@ export function LiveStreamWidget() {
 
   const abortRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  /* ── Drag-to-reposition ──────────────────────────────────── */
+
+  const { settings, setLiveStreamPosition } = useSettings()
+  const widgetRef = useRef<HTMLDivElement>(null)
+  const draggingRef = useRef(false)
+  const dragOffsetRef = useRef({ x: 0, y: 0 })
+
+  const savedPosition = settings.liveStreamPosition
+
+  const clampToViewport = useCallback((x: number, y: number) => {
+    if (typeof window === 'undefined') return { x, y }
+    const el = widgetRef.current
+    const w = el ? el.offsetWidth : 440
+    const h = el ? el.offsetHeight : 440
+    return {
+      x: Math.max(0, Math.min(x, window.innerWidth - w)),
+      y: Math.max(0, Math.min(y, window.innerHeight - h)),
+    }
+  }, [])
+
+  const handleDragStart = useCallback((clientX: number, clientY: number) => {
+    const el = widgetRef.current
+    if (!el) return
+    draggingRef.current = true
+    const rect = el.getBoundingClientRect()
+    dragOffsetRef.current = { x: clientX - rect.left, y: clientY - rect.top }
+    // Switch from bottom/right to left/top so drag math works
+    el.style.left = `${rect.left}px`
+    el.style.top = `${rect.top}px`
+    el.style.right = 'auto'
+    el.style.bottom = 'auto'
+    el.style.transition = 'none'
+  }, [])
+
+  const handleDragMove = useCallback((clientX: number, clientY: number) => {
+    if (!draggingRef.current || !widgetRef.current) return
+    const pos = clampToViewport(
+      clientX - dragOffsetRef.current.x,
+      clientY - dragOffsetRef.current.y,
+    )
+    widgetRef.current.style.left = `${pos.x}px`
+    widgetRef.current.style.top = `${pos.y}px`
+  }, [clampToViewport])
+
+  const handleDragEnd = useCallback(() => {
+    if (!draggingRef.current || !widgetRef.current) return
+    draggingRef.current = false
+    widgetRef.current.style.transition = ''
+    const rect = widgetRef.current.getBoundingClientRect()
+    setLiveStreamPosition(clampToViewport(rect.left, rect.top))
+  }, [clampToViewport, setLiveStreamPosition])
+
+  // Attach document-level listeners while dragging
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => handleDragMove(e.clientX, e.clientY)
+    const onMouseUp = () => handleDragEnd()
+    const onTouchMove = (e: TouchEvent) => {
+      if (draggingRef.current) e.preventDefault()
+      handleDragMove(e.touches[0].clientX, e.touches[0].clientY)
+    }
+    const onTouchEnd = () => handleDragEnd()
+
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+    document.addEventListener('touchmove', onTouchMove, { passive: false })
+    document.addEventListener('touchend', onTouchEnd)
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+      document.removeEventListener('touchmove', onTouchMove)
+      document.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [handleDragMove, handleDragEnd])
+
+  // Re-clamp on window resize (only when using left/top positioning)
+  useEffect(() => {
+    if (!savedPosition) return
+    const onResize = () => {
+      if (!widgetRef.current || draggingRef.current) return
+      const rect = widgetRef.current.getBoundingClientRect()
+      const clamped = clampToViewport(rect.left, rect.top)
+      widgetRef.current.style.left = `${clamped.x}px`
+      widgetRef.current.style.top = `${clamped.y}px`
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [savedPosition, clampToViewport])
 
   /* ── Filtering ─────────────────────────────────────────────── */
 
@@ -252,11 +341,13 @@ export function LiveStreamWidget() {
   if (state === 'collapsed') {
     return (
       <div
+        ref={widgetRef}
         className="flex items-center"
         style={{
           position: 'fixed',
-          bottom: 20,
-          right: 20,
+          ...(savedPosition
+            ? { left: savedPosition.x, top: savedPosition.y }
+            : { bottom: 20, right: 20 }),
           zIndex: 50,
           padding: '6px 6px 6px 14px',
           borderRadius: 'var(--radius-pill)',
@@ -268,6 +359,12 @@ export function LiveStreamWidget() {
           boxShadow: '0 4px 24px rgba(0,0,0,0.25)',
         }}
       >
+        <GripHorizontal
+          size={14}
+          style={{ color: 'var(--text-quaternary)', cursor: draggingRef.current ? 'grabbing' : 'grab', flexShrink: 0 }}
+          onMouseDown={e => { e.preventDefault(); handleDragStart(e.clientX, e.clientY) }}
+          onTouchStart={e => handleDragStart(e.touches[0].clientX, e.touches[0].clientY)}
+        />
         <span style={{
           width: 8, height: 8, borderRadius: '50%',
           background: streaming ? 'var(--system-green)' : 'var(--text-tertiary)',
@@ -316,10 +413,11 @@ export function LiveStreamWidget() {
   /* ── Expanded panel ───────────────────────────────────────── */
 
   return (
-    <div style={{
+    <div ref={widgetRef} style={{
       position: 'fixed',
-      bottom: 20,
-      right: 20,
+      ...(savedPosition
+        ? { left: savedPosition.x, top: savedPosition.y }
+        : { bottom: 20, right: 20 }),
       zIndex: 50,
       width: 440,
       height: 440,
@@ -333,12 +431,19 @@ export function LiveStreamWidget() {
       flexDirection: 'column',
       overflow: 'hidden',
     }}>
-      {/* ── Header ────────────────────────────────────────────── */}
-      <div className="flex items-center flex-shrink-0" style={{
-        padding: '10px 14px',
-        borderBottom: '1px solid var(--separator)',
-        gap: 8,
-      }}>
+      {/* ── Header (drag handle) ───────────────────────────────── */}
+      <div
+        className="flex items-center flex-shrink-0"
+        style={{
+          padding: '10px 14px',
+          borderBottom: '1px solid var(--separator)',
+          gap: 8,
+          cursor: draggingRef.current ? 'grabbing' : 'grab',
+          userSelect: 'none',
+        }}
+        onMouseDown={e => { e.preventDefault(); handleDragStart(e.clientX, e.clientY) }}
+        onTouchStart={e => handleDragStart(e.touches[0].clientX, e.touches[0].clientY)}
+      >
         <span style={{
           width: 8, height: 8, borderRadius: '50%',
           background: streaming ? 'var(--system-green)' : 'var(--text-tertiary)',

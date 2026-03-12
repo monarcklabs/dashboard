@@ -5,7 +5,7 @@
 ```bash
 npm run setup        # Auto-detect OpenClaw config, write .env.local
 npm run dev          # Start dev server (Turbopack, port 3000)
-npm test             # Run all 627 tests via Vitest (25 suites)
+npm test             # Run all 781 tests via Vitest (32 suites)
 npx tsc --noEmit     # Type-check (expect 0 errors)
 npx next build       # Production build
 ```
@@ -337,7 +337,7 @@ Used by: `lib/memory.ts`, `lib/cron-runs.ts`, `lib/kanban/chat-store.ts`, `lib/c
 
 ## Testing
 
-25 test suites, 627 tests total. All in `lib/` directory.
+32 test suites, 781 tests total.
 
 ```bash
 npx vitest run                     # All tests
@@ -362,6 +362,22 @@ Key test patterns:
 - No em dashes in agent responses (enforced via system prompt)
 - Call `requireEnv()` inside functions, not at module top level
 - No hardcoded operator names -- use `operatorName` from settings context
+
+## OpenClaw Integration
+
+ClawPort is the **UI layer** for [OpenClaw](https://openclaw.ai), the AI agent runtime. The boundary is deliberate: ClawPort reads workspace data and calls gateway endpoints but never executes agents directly.
+
+**Gateway protocol:** All AI calls route through the OpenClaw gateway at `localhost:18789`. Text chat uses `/v1/chat/completions` (streaming SSE). Vision uses the CLI pipeline (`openclaw gateway call chat.send` + poll `chat.history`) because the HTTP endpoint strips image content and `chat.send` requires device keypair signing.
+
+**CLI integration:** ClawPort shells out to `openclaw` for operations not exposed via HTTP -- `cron list`, `logs --follow`, `gateway call`. The binary path is set via `OPENCLAW_BIN`.
+
+**ACP (Agent Client Protocol):** OpenClaw's protocol for client-agent interaction. Sessions are scoped by `sessionKey`, authenticated via device keypairs. ClawPort uses ACP implicitly through the gateway and CLI.
+
+**Scope boundary:** Dashboard features (visualization, chat UI, settings, theming) belong here. Agent execution, gateway protocol, cron scheduling, memory storage, and CLI commands belong in OpenClaw.
+
+**Recent OpenClaw features:** ACP sessions (persistent conversations), backup commands (`openclaw backup create/restore`), context engine plugins (pluggable agent context providers), TUI workspace inference, output provenance tracking.
+
+See [docs/OPENCLAW.md](docs/OPENCLAW.md) for the full integration reference.
 
 ## Common Tasks
 

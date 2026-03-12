@@ -15,6 +15,7 @@ export interface ClawPortSettings {
   emojiOnly: boolean // show emoji avatars without colored background
   operatorName: string | null
   agentOverrides: Record<string, AgentOverride>
+  liveStreamPosition: { x: number; y: number } | null
 }
 
 const STORAGE_KEY = 'clawport-settings'
@@ -30,6 +31,7 @@ export const DEFAULTS: ClawPortSettings = {
   emojiOnly: false,
   operatorName: null,
   agentOverrides: {},
+  liveStreamPosition: null,
 }
 
 export function loadSettings(): ClawPortSettings {
@@ -59,6 +61,13 @@ export function loadSettings(): ClawPortSettings {
         parsed.agentOverrides && typeof parsed.agentOverrides === 'object'
           ? parsed.agentOverrides
           : {},
+      liveStreamPosition:
+        parsed.liveStreamPosition &&
+        typeof parsed.liveStreamPosition === 'object' &&
+        typeof parsed.liveStreamPosition.x === 'number' &&
+        typeof parsed.liveStreamPosition.y === 'number'
+          ? { x: parsed.liveStreamPosition.x, y: parsed.liveStreamPosition.y }
+          : null,
     }
   } catch {
     return { ...DEFAULTS }

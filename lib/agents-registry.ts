@@ -208,6 +208,7 @@ function discoverAgents(workspacePath: string): AgentEntry[] | null {
       color: DISCOVER_COLORS[colorIndex++ % DISCOVER_COLORS.length],
       emoji: rootEmoji,
       tools: ['read', 'write', 'exec', 'message'],
+      model: null,
       memoryPath: null,
       description: 'Top-level orchestrator.',
     })
@@ -252,6 +253,7 @@ function discoverAgents(workspacePath: string): AgentEntry[] | null {
           color: DISCOVER_COLORS[colorIndex++ % DISCOVER_COLORS.length],
           emoji: subName.charAt(0).toUpperCase(),
           tools: ['read', 'write'],
+          model: null,
           memoryPath: null,
           description: `${subName} agent.`,
         })
@@ -275,6 +277,7 @@ function discoverAgents(workspacePath: string): AgentEntry[] | null {
           color: DISCOVER_COLORS[colorIndex++ % DISCOVER_COLORS.length],
           emoji: subName.charAt(0).toUpperCase(),
           tools: ['read', 'write'],
+          model: null,
           memoryPath: null,
           description: `${subName} agent.`,
         })
@@ -343,6 +346,7 @@ function discoverAgents(workspacePath: string): AgentEntry[] | null {
         color: DISCOVER_COLORS[colorIndex++ % DISCOVER_COLORS.length],
         emoji: subName.charAt(0).toUpperCase(),
         tools: ['read', 'write'],
+        model: null,
         memoryPath: null,
         description: `${subName} agent.`,
       })
@@ -369,6 +373,7 @@ function discoverAgents(workspacePath: string): AgentEntry[] | null {
         color: DISCOVER_COLORS[colorIndex++ % DISCOVER_COLORS.length],
         emoji: subName.charAt(0).toUpperCase(),
         tools: ['read', 'write'],
+        model: null,
         memoryPath: null,
         description: `${subName} agent.`,
       })
@@ -385,6 +390,7 @@ function discoverAgents(workspacePath: string): AgentEntry[] | null {
       color: DISCOVER_COLORS[colorIndex++ % DISCOVER_COLORS.length],
       emoji: name.charAt(0).toUpperCase(),
       tools: ['read', 'write'],
+      model: null,
       memoryPath: null,
       description: `${name} agent.`,
     })
@@ -408,6 +414,7 @@ interface CliAgentEntry {
   id: string
   identityName?: string
   identityEmoji?: string
+  model?: string
   workspace?: string
   isDefault?: boolean
 }
@@ -457,6 +464,12 @@ function mergeExtraWorkspaces(
     // Try discovering agents from this workspace's filesystem
     const discovered = discoverAgents(ws)
     if (discovered) {
+      // Enrich with model from this CLI agent
+      if (cli.model) {
+        for (const d of discovered) {
+          if (!d.model) d.model = cli.model
+        }
+      }
       for (const agent of discovered) {
         if (existingIds.has(agent.id)) continue
         // Agents from other workspaces are top-level peers (no cross-workspace hierarchy)
@@ -482,6 +495,7 @@ function mergeExtraWorkspaces(
         color: DISCOVER_COLORS[colorIndex++ % DISCOVER_COLORS.length],
         emoji: cli.identityEmoji || name.charAt(0).toUpperCase(),
         tools: ['read', 'write'],
+        model: cli.model || null,
         memoryPath: null,
         description: `${name} agent.`,
       })
@@ -490,6 +504,29 @@ function mergeExtraWorkspaces(
   }
 
   return [...existing, ...added]
+}
+
+/**
+ * Enrich filesystem-discovered agents with model data from CLI output.
+ *
+ * All agents in a workspace share the CLI agent's configured model.
+ * CLI agents are matched to discovered agents by workspace path.
+ */
+function enrichModelsFromCli(
+  agents: AgentEntry[],
+  cliAgents: CliAgentEntry[],
+  primaryWorkspace: string,
+): void {
+  // Find CLI agent(s) for the primary workspace — take the default or first match
+  const primaryCli = cliAgents.find(c => c.workspace === primaryWorkspace && c.isDefault)
+    || cliAgents.find(c => c.workspace === primaryWorkspace)
+  if (primaryCli?.model) {
+    for (const agent of agents) {
+      if (!agent.model) {
+        agent.model = primaryCli.model
+      }
+    }
+  }
 }
 
 /**
@@ -521,11 +558,14 @@ export function loadRegistry(): AgentEntry[] {
     // 2. Auto-discover from primary workspace filesystem
     const discovered = discoverAgents(workspacePath)
 
-    // 2b. Merge agents from other workspaces known to the CLI
+    // 2b. Enrich with CLI model data + merge other workspaces
     if (discovered && openclawBin) {
       const cliAgents = listCliAgents(openclawBin)
-      if (cliAgents && cliAgents.length > 1) {
-        return mergeExtraWorkspaces(discovered, cliAgents, workspacePath)
+      if (cliAgents) {
+        enrichModelsFromCli(discovered, cliAgents, workspacePath)
+        if (cliAgents.length > 1) {
+          return mergeExtraWorkspaces(discovered, cliAgents, workspacePath)
+        }
       }
       return discovered
     }

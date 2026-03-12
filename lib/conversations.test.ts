@@ -55,6 +55,7 @@ const fakeAgent: Agent = {
   emoji: '?',
   tools: [],
   crons: [],
+  model: null,
   memoryPath: null,
   description: 'CSO. Decides what gets built.',
 }

@@ -4,6 +4,26 @@ Thank you for your interest in contributing to ClawPort. Whether you are fixing 
 
 This guide covers the conventions and process we follow so that contributions stay consistent and easy to review.
 
+## Scope & Policy
+
+Before opening a PR, please understand what ClawPort is and is not:
+
+- **ClawPort is a UI layer.** It renders data from OpenClaw. It does not execute agents, manage cron jobs, or handle orchestration. Features that belong in the OpenClaw runtime should be contributed upstream at [openclaw.ai](https://openclaw.ai).
+- **English-first.** All UI strings, error messages, log labels, and documentation must be in English. We do not accept localization or i18n PRs at this time.
+- **No server-side string changes** without maintainer approval. Agent registry names, AI system prompts, and slash command text are carefully tuned -- changes need discussion first.
+
+### What we will not merge
+
+To save everyone time, here are PR types we will close without review:
+
+- **Localization / i18n** -- adding translations, non-English strings, or internationalization infrastructure
+- **Docs rewrites** -- wholesale restructuring of existing documentation (small fixes and additions are welcome)
+- **Bundled scope creep** -- PRs that mix unrelated changes (e.g., a feature + a refactor + formatting fixes)
+- **Server-side string changes** -- modifying agent names, AI prompts, or slash command text without prior discussion
+- **Features that belong in OpenClaw** -- agent execution, gateway protocol changes, new CLI commands
+
+See [docs/OPENCLAW.md](docs/OPENCLAW.md) for a detailed breakdown of what belongs in ClawPort vs OpenClaw.
+
 ## Development Setup
 
 1. Fork and clone the repository:
@@ -91,6 +111,44 @@ Keep the subject under 72 characters. If you need to elaborate, leave a blank li
 - **One concern per PR.** A bug fix, a feature, or a refactor -- not all three at once.
 - **Tests included.** New behavior should have corresponding tests. Bug fixes should include a test that would have caught the bug.
 - **No unrelated changes.** Resist the urge to fix formatting or rename variables in files you are not otherwise touching. Those are welcome as separate PRs.
+
+## Before You Submit
+
+The npm `prepublishOnly` hook runs `npx tsc --noEmit && vitest run`, so your code must pass both type-checking and the full test suite. Save yourself a round-trip by running these locally before pushing:
+
+```bash
+npx tsc --noEmit     # Zero type errors
+npm test             # All 781 tests pass
+npx next build       # Clean production build (optional but recommended)
+```
+
+## Contributor Credit
+
+When we merge your PR, we add a `Co-Authored-By` trailer to the merge commit so GitHub attributes it to your profile. If you want to ensure your contribution shows up, include your GitHub no-reply email in the PR description:
+
+```
+Co-Authored-By: your-username <your-username@users.noreply.github.com>
+```
+
+## Architecture Overview
+
+If you want to understand the codebase before diving in, these resources will help:
+
+| Document | What it covers |
+|----------|---------------|
+| [CLAUDE.md](CLAUDE.md) | Full architecture guide: data flows, component map, conventions, common tasks |
+| [docs/API.md](docs/API.md) | REST API reference for all endpoints |
+| [docs/COMPONENTS.md](docs/COMPONENTS.md) | UI component catalog (50+ components) |
+| [docs/THEMING.md](docs/THEMING.md) | Theme system, CSS custom properties, settings API |
+| [docs/OPENCLAW.md](docs/OPENCLAW.md) | OpenClaw integration: gateway, CLI, ACP, scope boundaries |
+
+Key conventions to know:
+
+- **Inline styles with CSS custom properties** -- use `style={{ color: 'var(--text-primary)' }}` instead of Tailwind color classes.
+- **No external charting libraries** -- all visualizations are custom SVG + Canvas.
+- **Tests colocated with source** -- `lib/foo.ts` has `lib/foo.test.ts` in the same directory.
+- **`requireEnv()` inside functions** -- never at module top level (see `lib/env.ts`).
+- **No hardcoded operator names** -- use `operatorName` from the settings context.
 
 ## Reporting Bugs
 

@@ -129,6 +129,24 @@ export function AgentNode({ data, selected }: NodeProps) {
             {reportCount} reports
           </span>
         )}
+        {agent.model && (
+          <span
+            style={{
+              fontSize: "var(--text-caption2)",
+              fontWeight: "var(--weight-medium)",
+              color: "var(--text-tertiary)",
+              background: "var(--fill-tertiary)",
+              padding: "1px 7px",
+              borderRadius: 10,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              maxWidth: 120,
+            }}
+          >
+            {agent.model.split("/").pop()}
+          </span>
+        )}
         {hasCrons && (
           <span
             style={{

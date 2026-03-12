@@ -31,11 +31,12 @@ interface SettingsContextValue {
   setAgentOverride: (agentId: string, override: AgentOverride) => void
   clearAgentOverride: (agentId: string) => void
   getAgentDisplay: (agent: Agent) => AgentDisplay
+  setLiveStreamPosition: (pos: { x: number; y: number } | null) => void
   resetAll: () => void
 }
 
 const SettingsContext = createContext<SettingsContextValue>({
-  settings: { accentColor: null, portalName: null, portalSubtitle: null, portalEmoji: null, portalIcon: null, iconBgHidden: false, emojiOnly: false, operatorName: null, agentOverrides: {} },
+  settings: { accentColor: null, portalName: null, portalSubtitle: null, portalEmoji: null, portalIcon: null, iconBgHidden: false, emojiOnly: false, operatorName: null, agentOverrides: {}, liveStreamPosition: null },
   setAccentColor: () => {},
   setPortalName: () => {},
   setPortalSubtitle: () => {},
@@ -47,6 +48,7 @@ const SettingsContext = createContext<SettingsContextValue>({
   setAgentOverride: () => {},
   clearAgentOverride: () => {},
   getAgentDisplay: (agent) => ({ emoji: agent.emoji }),
+  setLiveStreamPosition: () => {},
   resetAll: () => {},
 })
 
@@ -156,6 +158,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     [settings, update],
   )
 
+  const setLiveStreamPosition = useCallback(
+    (pos: { x: number; y: number } | null) => {
+      update({ ...settings, liveStreamPosition: pos })
+    },
+    [settings, update],
+  )
+
   const getAgentDisplay = useCallback(
     (agent: Agent): AgentDisplay => {
       const override = settings.agentOverrides[agent.id]
@@ -179,6 +188,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       emojiOnly: false,
       operatorName: null,
       agentOverrides: {},
+      liveStreamPosition: null,
     }
     update(defaults)
   }, [update])
@@ -198,6 +208,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setAgentOverride,
         clearAgentOverride,
         getAgentDisplay,
+        setLiveStreamPosition,
         resetAll,
       }}
     >

@@ -11,6 +11,7 @@ export interface Agent {
   voiceId: string | null   // ElevenLabs voice ID
   color: string            // hex color for node
   emoji: string            // emoji identifier
+  model: string | null     // LLM model identifier (e.g. "anthropic/claude-sonnet-4-6")
   tools: string[]          // list of tools this agent has access to
   crons: CronJob[]         // associated cron jobs
   memoryPath: string | null
@@ -251,11 +252,47 @@ export interface IntegrationsSummary {
   configFound: boolean
 }
 
+// ── Memory Health Types ──────────────────────────────────────
+
+export type HealthSeverity = 'critical' | 'warning' | 'info' | 'ok'
+
+export interface MemoryHealthCheck {
+  id: string
+  severity: HealthSeverity
+  title: string
+  description: string
+  affectedFiles: string[] | null
+  action: string | null
+}
+
+export interface MemoryHealthSummary {
+  score: number
+  checks: MemoryHealthCheck[]
+  staleDailyLogs: StaleDailyLogInfo[]
+}
+
+export interface StaleDailyLogInfo {
+  relativePath: string
+  label: string
+  date: string
+  ageDays: number
+  sizeBytes: number
+}
+
+export type ReindexStatus = 'idle' | 'running' | 'success' | 'failed' | 'unavailable'
+
+export interface EditingHint {
+  id: string
+  text: string
+  severity: 'tip' | 'warning'
+}
+
 export interface MemoryApiResponse {
   files: MemoryFileInfo[]
   config: MemoryConfig
   status: MemoryStatus
   stats: MemoryStats
+  health: MemoryHealthSummary
 }
 
 // ── Activity Console Types ─────────────────────────────────────

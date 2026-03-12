@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback, Suspense } from 'react'
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import type { Agent } from '@/lib/types'
 import { AgentList, AgentListMobile } from '@/components/chat/AgentList'
@@ -7,7 +7,8 @@ import { ConversationView } from '@/components/chat/ConversationView'
 import { APP_NAME } from '@/lib/branding'
 import {
   loadConversations, saveConversations, getOrCreateConversation,
-  markRead, type ConversationStore
+  markRead, type ConversationStore, type Message,
+  fetchConversation, syncToServer, fromStoredMessage,
 } from '@/lib/conversations'
 
 function MessengerApp() {
@@ -32,12 +33,71 @@ function MessengerApp() {
     setConversations(loadConversations())
   }, [])
 
-  // Save conversations whenever they change
+  // Save conversations whenever they change (localStorage + server sync)
+  const prevConversationsRef = useRef<ConversationStore>({})
   useEffect(() => {
     if (Object.keys(conversations).length > 0) {
       saveConversations(conversations)
+
+      // Sync only new messages to server (fire-and-forget)
+      const prev = prevConversationsRef.current
+      for (const agentId of Object.keys(conversations)) {
+        const prevMsgs = prev[agentId]?.messages || []
+        const currMsgs = conversations[agentId]?.messages || []
+        if (currMsgs.length > prevMsgs.length) {
+          const prevIds = new Set(prevMsgs.map((m: Message) => m.id))
+          const newMsgs = currMsgs.filter((m: Message) => !prevIds.has(m.id))
+          if (newMsgs.length > 0) {
+            syncToServer(agentId, newMsgs)
+          }
+        }
+      }
+      prevConversationsRef.current = conversations
     }
   }, [conversations])
+
+  // Background merge: fetch server conversations and merge with localStorage
+  const mergedRef = useRef(false)
+  useEffect(() => {
+    if (loading || agents.length === 0 || mergedRef.current) return
+    mergedRef.current = true
+
+    Promise.all(
+      agents.map(async (agent) => {
+        const serverMsgs = await fetchConversation(agent.id)
+        return { agentId: agent.id, messages: serverMsgs }
+      })
+    ).then(results => {
+      setConversations(prev => {
+        let merged = { ...prev }
+        for (const { agentId, messages: serverMsgs } of results) {
+          if (serverMsgs.length === 0) continue
+          const existing = merged[agentId]
+          if (!existing) {
+            // Server has messages but localStorage doesn't — create conversation
+            merged[agentId] = {
+              agentId,
+              messages: serverMsgs.map(fromStoredMessage),
+              unread: 0,
+              lastActivity: serverMsgs[serverMsgs.length - 1].timestamp,
+            }
+          } else {
+            // Merge by message ID, sort by timestamp
+            const existingIds = new Set(existing.messages.map((m: Message) => m.id))
+            const newFromServer = serverMsgs
+              .filter(m => !existingIds.has(m.id))
+              .map(fromStoredMessage)
+            if (newFromServer.length > 0) {
+              const allMessages = [...existing.messages, ...newFromServer]
+                .sort((a, b) => a.timestamp - b.timestamp)
+              merged[agentId] = { ...existing, messages: allMessages }
+            }
+          }
+        }
+        return merged
+      })
+    })
+  }, [loading, agents])
 
   // Set default active agent on desktop only (don't auto-select on mobile)
   useEffect(() => {

@@ -92,6 +92,77 @@ export function updateLastMessage(store: ConversationStore, agentId: string, msg
   return { ...store, [agentId]: { ...conv, messages: msgs } }
 }
 
+// ── Server sync types & helpers ──────────────────────────
+
+/** Serializable message for server sync (mirrors StoredMessage from conversation-store) */
+export interface StoredMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: number
+}
+
+/** Convert a client Message to a StoredMessage (drops system messages) */
+export function toStoredMessage(msg: Message): StoredMessage | null {
+  if (msg.role === 'system') return null
+  return { id: msg.id, role: msg.role, content: msg.content, timestamp: msg.timestamp }
+}
+
+/** Convert a StoredMessage back to a client Message */
+export function fromStoredMessage(msg: StoredMessage): Message {
+  return { id: msg.id, role: msg.role, content: msg.content, timestamp: msg.timestamp }
+}
+
+/** Fetch conversation messages from the server */
+export async function fetchConversation(agentId: string): Promise<StoredMessage[]> {
+  try {
+    const res = await fetch(`/api/conversations/${encodeURIComponent(agentId)}`)
+    if (!res.ok) return []
+    return await res.json()
+  } catch {
+    return []
+  }
+}
+
+/** Sync messages to the server (fire-and-forget) */
+export function syncToServer(agentId: string, messages: Message[]): void {
+  const stored = messages.map(toStoredMessage).filter((m): m is StoredMessage => m !== null)
+  if (stored.length === 0) return
+  fetch(`/api/conversations/${encodeURIComponent(agentId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages: stored }),
+  }).catch(() => {})
+}
+
+/** Delete conversation on the server (fire-and-forget) */
+export function deleteOnServer(agentId: string): void {
+  fetch(`/api/conversations/${encodeURIComponent(agentId)}`, {
+    method: 'DELETE',
+  }).catch(() => {})
+}
+
+/** Fetch onboarded status from the server */
+export async function fetchOnboarded(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/onboarded')
+    if (!res.ok) return false
+    const data = await res.json()
+    return data.onboarded === true
+  } catch {
+    return false
+  }
+}
+
+/** Sync onboarded status to the server (fire-and-forget) */
+export function syncOnboarded(value: boolean): void {
+  fetch('/api/onboarded', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ onboarded: value }),
+  }).catch(() => {})
+}
+
 export function parseMedia(content: string): MediaAttachment[] {
   const media: MediaAttachment[] = []
 

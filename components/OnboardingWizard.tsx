@@ -7,6 +7,7 @@ import { useTheme } from '@/app/providers'
 import { APP_NAME } from '@/lib/branding'
 import { THEMES } from '@/lib/themes'
 import type { ThemeId } from '@/lib/themes'
+import { fetchOnboarded, syncOnboarded } from '@/lib/conversations'
 
 // ---------------------------------------------------------------------------
 // Accent color presets (same as settings page)
@@ -106,8 +107,21 @@ export function OnboardingWizard({ forceOpen, onClose }: OnboardingWizardProps) 
       setVisible(true)
       return
     }
-    if (typeof window !== 'undefined' && !localStorage.getItem('clawport-onboarded')) {
-      setVisible(true)
+    if (typeof window !== 'undefined') {
+      const localFlag = localStorage.getItem('clawport-onboarded')
+      // Always verify with server -- workspace may have moved since last session
+      fetchOnboarded().then(onboarded => {
+        if (onboarded) {
+          if (!localFlag) localStorage.setItem('clawport-onboarded', '1')
+        } else {
+          // Server says not onboarded (workspace changed or fresh install)
+          if (localFlag) localStorage.removeItem('clawport-onboarded')
+          setVisible(true)
+        }
+      }).catch(() => {
+        // Server unreachable -- trust localStorage if set, show wizard if not
+        if (!localFlag) setVisible(true)
+      })
     }
   }, [forceOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -182,6 +196,7 @@ export function OnboardingWizard({ forceOpen, onClose }: OnboardingWizardProps) 
     } else {
       if (!forceOpen) {
         localStorage.setItem('clawport-onboarded', '1')
+        syncOnboarded(true)
       }
       setVisible(false)
       onClose?.()

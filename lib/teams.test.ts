@@ -17,6 +17,7 @@ function agent(overrides: Partial<Agent> & { id: string }): Agent {
     emoji: 'A',
     tools: [],
     crons: [],
+    model: null,
     memoryPath: null,
     description: '',
     ...overrides,

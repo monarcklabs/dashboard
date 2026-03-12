@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Agent } from '@/lib/types'
 import type { Conversation, ConversationStore, Message, MediaAttachment } from '@/lib/conversations'
-import { parseMedia, addMessage, updateLastMessage } from '@/lib/conversations'
+import { parseMedia, addMessage, updateLastMessage, deleteOnServer } from '@/lib/conversations'
 import { buildApiContent } from '@/lib/multimodal'
 import { generateId } from '@/lib/id'
 import { useSettings } from '@/app/settings-provider'
@@ -633,6 +633,7 @@ export function ConversationView({ agent, conversation, onUpdate, onBack }: Conv
   ), [])
 
   function clearChat() {
+    deleteOnServer(agent.id)
     onUpdate(agent.id, prev => ({
       ...prev,
       [agent.id]: {
@@ -724,7 +725,7 @@ export function ConversationView({ agent, conversation, onUpdate, onBack }: Conv
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
             }}>
-              {agent.title}
+              {agent.title}{agent.model && ` · ${agent.model.split('/').pop()}`}{messages.length > 1 && ' · Synced'}
             </div>
           </div>
         </div>

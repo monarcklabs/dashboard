@@ -7,6 +7,7 @@ import { useSettings } from '@/app/settings-provider'
 import { AgentAvatar } from '@/components/AgentAvatar'
 import { OnboardingWizard } from '@/components/OnboardingWizard'
 import { APP_NAME } from '@/lib/branding'
+import { deleteOnServer } from '@/lib/conversations'
 
 // ---------------------------------------------------------------------------
 // Accent color presets
@@ -921,6 +922,38 @@ export default function SettingsPage() {
             >
               <Trash2 size={16} />
               Reset All Settings
+            </button>
+            <button
+              onClick={async () => {
+                if (!window.confirm('Delete all server-side conversation data?')) return
+                try {
+                  const res = await fetch('/api/conversations')
+                  if (!res.ok) throw new Error()
+                  const ids: string[] = await res.json()
+                  ids.forEach(id => deleteOnServer(id))
+                  alert('Cleared')
+                } catch {
+                  alert('Failed to clear server data')
+                }
+              }}
+              className="btn-scale"
+              style={{
+                padding: 'var(--space-2) var(--space-6)',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--system-red)',
+                color: '#fff',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 'var(--text-body)',
+                fontWeight: 'var(--weight-semibold)',
+                transition: 'all 150ms var(--ease-spring)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+              }}
+            >
+              <Trash2 size={16} />
+              Clear Server Data
             </button>
           </div>
         </section>

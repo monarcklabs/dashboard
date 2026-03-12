@@ -90,7 +90,7 @@ Help the user with this ticket. Stay in character as ${agent.name}, ${agent.titl
 
   try {
     const stream = await openai.chat.completions.create({
-      model: 'claude-sonnet-4-6',
+      model: agent.model || 'claude-sonnet-4-6',
       stream: true,
       messages: [
         { role: 'system' as const, content: systemPrompt },

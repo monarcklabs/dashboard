@@ -93,7 +93,7 @@ export async function POST(
 
   try {
     const stream = await openai.chat.completions.create({
-      model: 'claude-sonnet-4-6',
+      model: agent.model || 'claude-sonnet-4-6',
       stream: true,
       messages: [
         { role: 'system' as const, content: systemPrompt },

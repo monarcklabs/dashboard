@@ -5,6 +5,48 @@ All notable changes to [clawport-ui](https://www.npmjs.com/package/clawport-ui) 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2026-03-10
+
+### Changed
+
+- Memory Overview UX rework: replaced 4 equal stat cards with a single HealthHero component (prominent health score + compact stat pills). Moved Memory Advisor to position #2 (right after hero). Pushed timeline below health checks. Removed redundant StaleDailyLogsCard.
+
+### Added
+
+- `vector-search-disabled` health check -- flags when OpenClaw vector search is not enabled, with advisor guidance on setup and indexing.
+
+## [0.8.1] - 2026-03-10
+
+### Added
+
+- Server-side chat persistence with JSONL-based conversation storage. Conversations sync across devices automatically.
+- Cross-device onboarding flag, "Synced" indicator in chat header, "Clear Server Data" button in settings.
+- 26 new tests for conversation store.
+
+### Contributors
+
+- [@raphfeuer](https://github.com/raphfeuer) (PR #8)
+
+## [0.8.0] - 2026-03-09
+
+### Changed
+
+- Configurable gateway port (auto-detected from OpenClaw config).
+- Agent Optimizer redesign with streamlined UI.
+- Markdown code blocks in chat now render with syntax highlighting.
+
+## [0.7.0] - 2026-03-08
+
+### Added
+
+- Sidebar usage widget showing token consumption at a glance.
+- Cost Dashboard breakup into modular sub-components (OptimizationPanel, DailyCostChart, RunDetailTable, TokenDonut, TopCrons).
+- Live logs overhaul with improved stream parsing and UI.
+- Claude Code usage tracker.
+- Memory v2: health checks, editing hints, reindex API, and AI Memory Advisor with inline chat.
+- Pipeline health check with inline agent chat and self-heal actions.
+- Cost optimization engine with AI analysis.
+
 ## [0.6.4] - 2026-03-07
 
 ### Fixed
@@ -241,6 +283,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Memory browser.
 - Next.js 16 App Router with Turbopack.
 
+[0.8.2]: https://github.com/JohnRiceML/clawport-ui/compare/v0.8.1...v0.8.2
+[0.8.1]: https://github.com/JohnRiceML/clawport-ui/compare/v0.8.0...v0.8.1
+[0.8.0]: https://github.com/JohnRiceML/clawport-ui/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/JohnRiceML/clawport-ui/compare/v0.6.4...v0.7.0
 [0.6.4]: https://github.com/JohnRiceML/clawport-ui/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/JohnRiceML/clawport-ui/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/JohnRiceML/clawport-ui/compare/v0.6.1...v0.6.2

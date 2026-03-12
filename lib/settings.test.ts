@@ -35,6 +35,7 @@ describe('loadSettings', () => {
       emojiOnly: false,
       operatorName: null,
       agentOverrides: {},
+      liveStreamPosition: null,
     })
   })
 
@@ -90,6 +91,7 @@ describe('saveSettings', () => {
       emojiOnly: false,
       operatorName: null,
       agentOverrides: {},
+      liveStreamPosition: null,
     }
     saveSettings(settings)
     expect(localStorageMock.setItem).toHaveBeenCalledWith(
@@ -111,6 +113,7 @@ describe('saveSettings', () => {
       agentOverrides: {
         vera: { emoji: '🧙', profileImage: 'data:image/jpeg;base64,abc' },
       },
+      liveStreamPosition: null,
     }
     saveSettings(settings)
     const loaded = loadSettings()
