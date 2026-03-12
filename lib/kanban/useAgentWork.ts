@@ -4,12 +4,41 @@ import { useEffect, useRef, useCallback } from 'react'
 import type { KanbanTicket, TicketStatus } from './types'
 import type { KanbanStore } from './store'
 import { executeWork, getWorkPrompt, persistWorkChat } from './automation'
+import { generateId } from '../id'
 
 const MAX_CONCURRENT_WORK = 3
+
+// Unique ID for this browser tab — used as lock owner
+const TAB_OWNER = generateId()
 
 interface UseAgentWorkOptions {
   tickets: KanbanStore
   onUpdateTicket: (ticketId: string, updates: Partial<KanbanTicket>) => void
+}
+
+async function tryAcquireLock(ticketId: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/kanban/work-lock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticketId, owner: TAB_OWNER, action: 'acquire' }),
+    })
+    if (!res.ok) return false
+    const data = await res.json()
+    return data.acquired === true
+  } catch {
+    return false
+  }
+}
+
+async function releaseLock(ticketId: string): Promise<void> {
+  try {
+    await fetch('/api/kanban/work-lock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticketId, owner: TAB_OWNER, action: 'release' }),
+    })
+  } catch { /* best-effort */ }
 }
 
 export function useAgentWork({ tickets, onUpdateTicket }: UseAgentWorkOptions) {
@@ -17,13 +46,14 @@ export function useAgentWork({ tickets, onUpdateTicket }: UseAgentWorkOptions) {
   const abortControllers = useRef<Map<string, AbortController>>(new Map())
   const unmounted = useRef(false)
 
-  // Clean up on unmount: abort all in-flight work
+  // Clean up on unmount: abort all in-flight work and release locks
   useEffect(() => {
     unmounted.current = false
     return () => {
       unmounted.current = true
-      for (const [, controller] of abortControllers.current) {
+      for (const [ticketId, controller] of abortControllers.current) {
         controller.abort()
+        releaseLock(ticketId)
       }
       abortControllers.current.clear()
       activeWork.current.clear()
@@ -33,6 +63,15 @@ export function useAgentWork({ tickets, onUpdateTicket }: UseAgentWorkOptions) {
   const runWork = useCallback(async (ticket: KanbanTicket) => {
     const { id, assigneeId } = ticket
     if (!assigneeId) return
+
+    // Acquire server-side lock — if another browser already claimed this ticket, bail
+    const locked = await tryAcquireLock(id)
+    if (!locked) {
+      activeWork.current.delete(id)
+      // Another browser is working on it — revert to idle so we don't block it
+      onUpdateTicket(id, { workState: 'idle' })
+      return
+    }
 
     const controller = new AbortController()
     abortControllers.current.set(id, controller)
@@ -46,6 +85,9 @@ export function useAgentWork({ tickets, onUpdateTicket }: UseAgentWorkOptions) {
     })
 
     const result = await executeWork(assigneeId, ticket, undefined, controller.signal)
+
+    // Release lock regardless of outcome
+    await releaseLock(id)
 
     // Bail if component unmounted while we were working
     if (unmounted.current) return
@@ -74,6 +116,27 @@ export function useAgentWork({ tickets, onUpdateTicket }: UseAgentWorkOptions) {
     activeWork.current.delete(id)
   }, [onUpdateTicket])
 
+  // Recover tickets stuck in working/starting state (e.g. browser closed mid-work)
+  // If workStartedAt is older than timeout + 30s buffer and not actively tracked, mark as failed.
+  const STALE_THRESHOLD_MS = 150_000 // 2.5 min (timeout is 2 min)
+
+  useEffect(() => {
+    const now = Date.now()
+    for (const ticket of Object.values(tickets)) {
+      if (
+        (ticket.workState === 'working' || ticket.workState === 'starting') &&
+        ticket.workStartedAt &&
+        now - ticket.workStartedAt > STALE_THRESHOLD_MS &&
+        !activeWork.current.has(ticket.id)
+      ) {
+        onUpdateTicket(ticket.id, {
+          workState: 'failed',
+          workError: 'Agent work appears stuck (no response received). You can retry.',
+        })
+      }
+    }
+  }, [tickets, onUpdateTicket])
+
   // Scan for eligible tickets
   useEffect(() => {
     const eligible = Object.values(tickets).filter(
@@ -90,7 +153,7 @@ export function useAgentWork({ tickets, onUpdateTicket }: UseAgentWorkOptions) {
       // Set starting state synchronously to prevent re-triggers on next render
       onUpdateTicket(ticket.id, { workState: 'starting' })
 
-      // Fire async work
+      // Fire async work (lock acquisition happens inside runWork)
       runWork(ticket)
     }
   }, [tickets, onUpdateTicket, runWork])

@@ -1,4 +1,4 @@
-import { readFileSync, appendFileSync, mkdirSync, existsSync } from 'fs'
+import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync, unlinkSync } from 'fs'
 import path from 'path'
 import { requireEnv } from '@/lib/env'
 
@@ -50,9 +50,18 @@ export function getChatMessages(ticketId: string): StoredChatMessage[] {
   try {
     const content = readFileSync(filePath, 'utf-8')
     const messages: StoredChatMessage[] = []
+    const seenIds = new Set<string>()
+    const seenSignatures = new Set<string>()
     for (const line of content.split('\n')) {
       const msg = parseLine(line)
-      if (msg) messages.push(msg)
+      if (!msg) continue
+      // Deduplicate by ID and by role+content (multi-browser writes)
+      if (seenIds.has(msg.id)) continue
+      const sig = `${msg.role}:${normalizeContent(msg.content)}`
+      if (seenSignatures.has(sig)) continue
+      seenIds.add(msg.id)
+      seenSignatures.add(sig)
+      messages.push(msg)
     }
     messages.sort((a, b) => a.timestamp - b.timestamp)
     return messages
@@ -62,9 +71,17 @@ export function getChatMessages(ticketId: string): StoredChatMessage[] {
 }
 
 /**
+ * Normalize content for dedup comparison: trim + collapse whitespace + lowercase.
+ */
+function normalizeContent(s: string): string {
+  return s.trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
+/**
  * Append chat messages to a ticket's JSONL file.
  * Creates the chats directory and file if they don't exist.
- * Deduplicates by message ID to prevent duplicates on retry.
+ * Deduplicates by message ID and by content similarity (handles
+ * multiple browsers generating independent messages for the same exchange).
  */
 export function appendChatMessages(ticketId: string, messages: StoredChatMessage[]): void {
   const chatsDir = getChatsDir()
@@ -77,7 +94,15 @@ export function appendChatMessages(ticketId: string, messages: StoredChatMessage
   if (existsSync(filePath)) {
     const existing = getChatMessages(ticketId)
     const existingIds = new Set(existing.map(m => m.id))
-    newMessages = messages.filter(m => !existingIds.has(m.id))
+    // Build a set of role+content signatures for content-based dedup.
+    // Two browsers sending the same user message generate different IDs
+    // but identical role+content — skip those.
+    const existingSignatures = new Set(
+      existing.map(m => `${m.role}:${normalizeContent(m.content)}`)
+    )
+    newMessages = messages.filter(m =>
+      !existingIds.has(m.id) && !existingSignatures.has(`${m.role}:${normalizeContent(m.content)}`)
+    )
     if (newMessages.length === 0) return
   }
   const lines = newMessages.map(m => JSON.stringify({
@@ -88,4 +113,89 @@ export function appendChatMessages(ticketId: string, messages: StoredChatMessage
   }))
 
   appendFileSync(filePath, lines.join('\n') + '\n', 'utf-8')
+}
+
+/* ── Work lock (prevents multiple browsers executing the same ticket) ── */
+
+const LOCK_STALE_MS = 180_000 // 3 minutes — auto-expire stale locks
+
+interface WorkLock {
+  owner: string   // opaque client ID
+  ticketId: string
+  acquiredAt: number
+}
+
+function getLocksDir(): string {
+  return path.resolve(requireEnv('WORKSPACE_PATH'), '..', 'kanban', 'locks')
+}
+
+function lockPath(ticketId: string): string {
+  return path.join(getLocksDir(), `${ticketId}.lock`)
+}
+
+/**
+ * Try to acquire an exclusive work lock for a ticket.
+ * Returns true if the lock was acquired, false if another client holds it.
+ * Stale locks (older than LOCK_STALE_MS) are automatically broken.
+ */
+export function acquireWorkLock(ticketId: string, owner: string): boolean {
+  const dir = getLocksDir()
+  mkdirSync(dir, { recursive: true })
+  const fp = lockPath(ticketId)
+
+  // Check existing lock
+  if (existsSync(fp)) {
+    try {
+      const existing: WorkLock = JSON.parse(readFileSync(fp, 'utf-8'))
+      // Same owner can re-acquire (idempotent)
+      if (existing.owner === owner) return true
+      // Break stale locks
+      if (Date.now() - existing.acquiredAt < LOCK_STALE_MS) return false
+      // Stale — fall through to overwrite
+    } catch {
+      // Corrupt lock file — overwrite
+    }
+  }
+
+  const lock: WorkLock = { owner, ticketId, acquiredAt: Date.now() }
+  writeFileSync(fp, JSON.stringify(lock), 'utf-8')
+  return true
+}
+
+/**
+ * Release a work lock. Only the owner can release it.
+ * Returns true if released, false if not owned by this client.
+ */
+export function releaseWorkLock(ticketId: string, owner: string): boolean {
+  const fp = lockPath(ticketId)
+  if (!existsSync(fp)) return true
+
+  try {
+    const existing: WorkLock = JSON.parse(readFileSync(fp, 'utf-8'))
+    if (existing.owner !== owner) return false
+  } catch {
+    // Corrupt — safe to remove
+  }
+
+  try { unlinkSync(fp) } catch { /* already gone */ }
+  return true
+}
+
+/**
+ * Check if a ticket has an active (non-stale) work lock.
+ */
+export function isWorkLocked(ticketId: string): { locked: boolean; owner?: string } {
+  const fp = lockPath(ticketId)
+  if (!existsSync(fp)) return { locked: false }
+
+  try {
+    const existing: WorkLock = JSON.parse(readFileSync(fp, 'utf-8'))
+    if (Date.now() - existing.acquiredAt >= LOCK_STALE_MS) {
+      try { unlinkSync(fp) } catch { /* race */ }
+      return { locked: false }
+    }
+    return { locked: true, owner: existing.owner }
+  } catch {
+    return { locked: false }
+  }
 }

@@ -172,6 +172,7 @@ export default function KanbanPage() {
         status: 'todo',
         workState: 'idle',
         workError: null,
+        workResult: null,
         workStartedAt: null,
       }),
     )

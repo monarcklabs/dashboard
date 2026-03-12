@@ -210,6 +210,7 @@ export function TicketDetailPanel({
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const [mdModalContent, setMdModalContent] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -245,8 +246,16 @@ export function TicketDetailPanel({
   useEffect(() => {
     const workResult = ticket.workResult
     if (!workResult) return
+    const workResultNorm = workResult.trim().toLowerCase()
     setMessages(prev => {
-      if (prev.some(msg => msg.role === 'assistant' && msg.content.trim() === workResult.trim())) {
+      // Skip if any assistant message already contains this work result
+      // (may have been loaded from persisted history with a different ID)
+      if (prev.some(msg =>
+        msg.role === 'assistant' && (
+          msg.id === `work-result-${ticket.id}` ||
+          msg.content.trim().toLowerCase() === workResultNorm
+        )
+      )) {
         return prev
       }
       return [
@@ -266,14 +275,20 @@ export function TicketDetailPanel({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Escape key to close
+  // Escape key to close (modal first, then panel)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        if (mdModalContent) {
+          setMdModalContent(null)
+        } else {
+          onClose()
+        }
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+  }, [onClose, mdModalContent])
 
   // Focus close button on mount
   useEffect(() => {
@@ -282,17 +297,7 @@ export function TicketDetailPanel({
 
   const openMarkdownDocument = useCallback((content: string) => {
     if (!content) return
-    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const opened = window.open(url, '_blank', 'noopener,noreferrer')
-    if (!opened) {
-      const a = document.createElement('a')
-      a.href = url
-      a.target = '_blank'
-      a.rel = 'noopener noreferrer'
-      a.click()
-    }
-    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    setMdModalContent(content)
   }, [])
 
   /* ── Send message + stream response ─────────────── */
@@ -427,6 +432,7 @@ export function TicketDetailPanel({
   const accentColor = 'var(--accent)'
 
   return (
+    <>
     <div
       className="fixed inset-0 z-40 md:absolute md:inset-y-0 md:right-0 md:left-auto md:z-30 panel-slide-in"
     >
@@ -665,16 +671,16 @@ export function TicketDetailPanel({
             </div>
           )}
 
-          {/* Work failed banner */}
-          {ticket.workState === 'failed' && (
+          {/* Work failed / empty result banner */}
+          {(ticket.workState === 'failed' || (ticket.workState === 'done' && !ticket.workResult)) && (
             <div style={{
               padding: '0 var(--space-5) var(--space-4)',
             }}>
               <div style={{
                 padding: 'var(--space-3)',
                 borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--system-red)',
-                background: 'color-mix(in srgb, var(--system-red) 8%, transparent)',
+                border: `1px solid ${ticket.workState === 'failed' ? 'var(--system-red)' : 'var(--system-orange)'}`,
+                background: `color-mix(in srgb, ${ticket.workState === 'failed' ? 'var(--system-red)' : 'var(--system-orange)'} 8%, transparent)`,
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 'var(--space-2)',
@@ -682,9 +688,9 @@ export function TicketDetailPanel({
                 <div style={{
                   fontSize: 'var(--text-footnote)',
                   fontWeight: 600,
-                  color: 'var(--system-red)',
+                  color: ticket.workState === 'failed' ? 'var(--system-red)' : 'var(--system-orange)',
                 }}>
-                  Agent work failed
+                  {ticket.workState === 'failed' ? 'Agent work failed' : 'Agent work completed but returned no result'}
                 </div>
                 {ticket.workError && (
                   <div style={{
@@ -704,9 +710,9 @@ export function TicketDetailPanel({
                       fontWeight: 600,
                       padding: '3px var(--space-3)',
                       borderRadius: 'var(--radius-sm)',
-                      border: '1px solid var(--system-red)',
+                      border: `1px solid ${ticket.workState === 'failed' ? 'var(--system-red)' : 'var(--system-orange)'}`,
                       background: 'transparent',
-                      color: 'var(--system-red)',
+                      color: ticket.workState === 'failed' ? 'var(--system-red)' : 'var(--system-orange)',
                       cursor: 'pointer',
                     }}
                   >
@@ -928,5 +934,84 @@ export function TicketDetailPanel({
         </div>
       </div>
     </div>
+
+    {/* Markdown modal */}
+    {mdModalContent && (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 100,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(0,0,0,0.55)',
+          backdropFilter: 'blur(4px)',
+        }}
+        onClick={() => setMdModalContent(null)}
+      >
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            background: 'var(--bg)',
+            border: '1px solid var(--separator)',
+            borderRadius: 'var(--radius-lg)',
+            width: '90vw',
+            maxWidth: 720,
+            maxHeight: '80vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 24px 48px rgba(0,0,0,0.3)',
+          }}
+        >
+          {/* Modal header */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: 'var(--space-3) var(--space-4)',
+            borderBottom: '1px solid var(--separator)',
+            flexShrink: 0,
+          }}>
+            <span style={{
+              fontSize: 'var(--text-footnote)',
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+            }}>
+              Response
+            </span>
+            <button
+              type="button"
+              onClick={() => setMdModalContent(null)}
+              className="focus-ring"
+              style={{
+                background: 'var(--fill-tertiary)',
+                border: '1px solid var(--separator)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '4px 10px',
+                fontSize: 'var(--text-caption2)',
+                fontWeight: 600,
+                color: 'var(--text-secondary)',
+                cursor: 'pointer',
+              }}
+            >
+              Close
+            </button>
+          </div>
+
+          {/* Modal body */}
+          <div style={{
+            padding: 'var(--space-4)',
+            overflowY: 'auto',
+            fontSize: 'var(--text-footnote)',
+            lineHeight: 1.6,
+            color: 'var(--text-primary)',
+          }}>
+            {formatContent(mdModalContent)}
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
