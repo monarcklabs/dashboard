@@ -50,26 +50,18 @@ function AgentCard({
         borderRadius: "var(--radius-md)",
         background: "var(--material-regular)",
         border: selected
-          ? `1.5px solid ${agent.color}`
+          ? `1px solid color-mix(in srgb, ${agent.color} 40%, var(--separator))`
           : "1px solid var(--separator)",
-        borderTop: `2px solid ${agent.color}`,
         cursor: "pointer",
         width: "100%",
         textAlign: "left",
         transition: "all 150ms var(--ease-spring)",
         boxShadow: selected
-          ? `0 0 0 1px ${agent.color}40, 0 4px 16px ${agent.color}18`
+          ? `0 0 0 1px color-mix(in srgb, ${agent.color} 16%, transparent), var(--shadow-subtle)`
           : "var(--shadow-subtle)",
       }}
     >
-      <AgentAvatar
-        agent={agent}
-        size={40}
-        borderRadius={11}
-        style={{
-          border: `1px solid ${agent.color}30`,
-        }}
-      />
+      <AgentAvatar agent={agent} size={40} borderRadius={11} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
@@ -86,16 +78,34 @@ function AgentCard({
         </div>
         <div
           style={{
-            fontSize: "var(--text-caption1)",
-            color: agent.color,
-            opacity: 0.8,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            minWidth: 0,
             marginTop: 1,
           }}
         >
-          {agent.title}
+          <span
+            aria-hidden="true"
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              background: agent.color,
+              flexShrink: 0,
+            }}
+          />
+          <div
+            style={{
+              fontSize: "var(--text-caption1)",
+              color: "var(--text-secondary)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {agent.title}
+          </div>
         </div>
         {agent.description && (
           <div

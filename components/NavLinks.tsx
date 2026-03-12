@@ -210,8 +210,11 @@ export function NavLinks({ bottomSlot }: { bottomSlot?: React.ReactNode } = {}) 
                   borderRadius: '8px',
                   fontSize: '13px',
                   fontWeight: isActive ? 600 : 500,
-                  color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
-                  background: isActive ? 'var(--accent-fill)' : 'transparent',
+                  color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  background: isActive ? 'var(--material-thin)' : 'transparent',
+                  boxShadow: isActive
+                    ? 'inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 5%, transparent)'
+                    : 'none',
                   textDecoration: 'none',
                   transition: 'all 100ms var(--ease-smooth)',
                 }}
@@ -220,7 +223,7 @@ export function NavLinks({ bottomSlot }: { bottomSlot?: React.ReactNode } = {}) 
                   size={16}
                   style={{
                     flexShrink: 0,
-                    color: isActive ? 'var(--accent)' : 'var(--text-tertiary)',
+                    color: isActive ? 'var(--text-secondary)' : 'var(--text-tertiary)',
                     transition: 'color 100ms var(--ease-smooth)',
                   }}
                 />
@@ -255,7 +258,7 @@ export function NavLinks({ bottomSlot }: { bottomSlot?: React.ReactNode } = {}) 
                 justifyContent: 'center',
                 fontSize: '11px',
                 fontWeight: 700,
-                color: 'var(--accent)',
+                color: 'var(--text-primary)',
                 flexShrink: 0,
                 letterSpacing: '-0.02em',
               }}
