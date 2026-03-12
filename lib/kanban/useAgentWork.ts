@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import type { KanbanTicket, TicketStatus } from './types'
 import type { KanbanStore } from './store'
-import { executeWork, getWorkPrompt, persistWorkChat } from './automation'
+import { executeWork, getWorkPrompt, parseWorkDisposition, persistWorkChat } from './automation'
 import { generateId } from '../id'
 
 const MAX_CONCURRENT_WORK = 3
@@ -95,15 +95,21 @@ export function useAgentWork({ tickets, onUpdateTicket }: UseAgentWorkOptions) {
     abortControllers.current.delete(id)
 
     if (result.success) {
+      const parsed = parseWorkDisposition(result.content)
+
       // Save chat history so TicketDetailPanel picks it up
       const prompt = getWorkPrompt(ticket)
-      const persisted = await persistWorkChat(id, prompt, result.content)
+      const persisted = await persistWorkChat(id, prompt, parsed.content)
 
-      // Move to review with result
+      const nextStatus: TicketStatus =
+        parsed.disposition === 'working'
+          ? 'in-progress'
+          : 'review'
+
       onUpdateTicket(id, {
-        status: 'review' as TicketStatus,
+        status: nextStatus,
         workState: 'done',
-        workResult: result.content,
+        workResult: parsed.content,
         workError: persisted ? null : 'Saved work result, but chat history did not persist.',
       })
     } else {

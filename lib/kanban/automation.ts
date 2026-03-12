@@ -3,6 +3,8 @@
 import type { KanbanTicket, TeamRole } from './types'
 import { generateId } from '../id'
 
+export type WorkDisposition = 'completed' | 'needs_input' | 'working'
+
 /* ── Role-specific work prompts ──────────────────────── */
 
 const ROLE_PROMPTS: Record<TeamRole, string> = {
@@ -39,16 +41,63 @@ const FALLBACK_PROMPT = `You are working this ticket. Provide:
 
 Be concise and actionable.`
 
+const WORKFLOW_STATUS_INSTRUCTIONS = `
+
+Start the first line exactly as one of:
+- Workflow status: completed
+- Workflow status: needs_input
+- Workflow status: working
+
+Use:
+- completed: only when the task is actually done and ready for review
+- needs_input: only when you need human input, approval, or clarification
+- working: when you made progress but the task is not complete yet
+
+After that first line, give the actual update for the ticket.`
+
 export function getWorkPrompt(ticket: KanbanTicket): string {
   const rolePrompt = ticket.assigneeRole
     ? ROLE_PROMPTS[ticket.assigneeRole] ?? FALLBACK_PROMPT
     : FALLBACK_PROMPT
 
-  return `${rolePrompt}
+  return `${rolePrompt}${WORKFLOW_STATUS_INSTRUCTIONS}
 
 Ticket: ${ticket.title}
 ${ticket.description ? `Description: ${ticket.description}` : 'No description provided.'}
 Priority: ${ticket.priority}`
+}
+
+export function parseWorkDisposition(rawContent: string): {
+  disposition: WorkDisposition
+  content: string
+} {
+  const trimmed = rawContent.trim()
+  const statusMatch = trimmed.match(/^workflow status:\s*(completed|needs_input|working)\s*$/im)
+
+  if (statusMatch) {
+    const disposition = statusMatch[1].toLowerCase() as WorkDisposition
+    const content = trimmed
+      .replace(/^workflow status:\s*(completed|needs_input|working)\s*$/im, '')
+      .trim()
+    return { disposition, content: content || trimmed }
+  }
+
+  return {
+    disposition: inferWorkDisposition(trimmed),
+    content: trimmed,
+  }
+}
+
+function inferWorkDisposition(content: string): WorkDisposition {
+  if (/\b(need[s]? your input|need[s]? input|need[s]? approval|please confirm|can you provide|could you provide|waiting for you|which one|what should|confirm whether)\b/i.test(content)) {
+    return 'needs_input'
+  }
+
+  if (/\b(completed|complete|finished|done|all set|ready for review|successfully (?:updated|processed|completed)|task is complete)\b/i.test(content)) {
+    return 'completed'
+  }
+
+  return 'working'
 }
 
 /* ── Execute work via chat API ───────────────────────── */

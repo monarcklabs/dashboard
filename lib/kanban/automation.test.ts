@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { getWorkPrompt, executeWork, persistWorkChat } from './automation'
+import { getWorkPrompt, executeWork, parseWorkDisposition, persistWorkChat } from './automation'
 import type { KanbanTicket } from './types'
 
 /* ── Helpers ─────────────────────────────────────────── */
@@ -82,6 +82,37 @@ describe('getWorkPrompt', () => {
   it('handles empty description', () => {
     const prompt = getWorkPrompt(makeTicket({ description: '' }))
     expect(prompt).toContain('No description provided')
+  })
+
+  it('requires a workflow status line', () => {
+    const prompt = getWorkPrompt(makeTicket())
+    expect(prompt).toContain('Workflow status: completed')
+    expect(prompt).toContain('Workflow status: needs_input')
+    expect(prompt).toContain('Workflow status: working')
+  })
+})
+
+describe('parseWorkDisposition', () => {
+  it('extracts explicit completed status and strips the header', () => {
+    const result = parseWorkDisposition('Workflow status: completed\n\nProcessed the last 10 orders.')
+    expect(result.disposition).toBe('completed')
+    expect(result.content).toBe('Processed the last 10 orders.')
+  })
+
+  it('extracts explicit needs_input status', () => {
+    const result = parseWorkDisposition('Workflow status: needs_input\n\nPlease confirm which sheet to update.')
+    expect(result.disposition).toBe('needs_input')
+    expect(result.content).toBe('Please confirm which sheet to update.')
+  })
+
+  it('defaults progress updates to working', () => {
+    const result = parseWorkDisposition('Sheets config confirmed. Now fetching the last 10 orders and verifying the Invoice Log header.')
+    expect(result.disposition).toBe('working')
+  })
+
+  it('falls back to completed for obvious done language', () => {
+    const result = parseWorkDisposition('Completed the order reconciliation and updated the invoice log.')
+    expect(result.disposition).toBe('completed')
   })
 })
 
