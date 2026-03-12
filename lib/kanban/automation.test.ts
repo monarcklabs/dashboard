@@ -9,6 +9,7 @@ function makeTicket(overrides: Partial<KanbanTicket> = {}): KanbanTicket {
     id: 'ticket-1',
     title: 'Build login page',
     description: 'Implement login with email/password',
+    useSessionMemory: false,
     status: 'todo',
     priority: 'high',
     assigneeId: 'agent-1',
@@ -191,6 +192,26 @@ describe('executeWork', () => {
     const result = await executeWork('agent-1', makeTicket())
     expect(result.success).toBe(true)
     expect(result.content).toBe('GoodAlso good')
+  })
+
+  it('forwards the session-memory flag in the chat request', async () => {
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('data: {"content":"ok"}\n\ndata: [DONE]\n\n'))
+        controller.close()
+      },
+    })
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      body: stream,
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await executeWork('agent-1', makeTicket({ useSessionMemory: true }))
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body.ticket.useSessionMemory).toBe(true)
   })
 })
 

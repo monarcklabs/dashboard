@@ -47,6 +47,7 @@ describe('loadTickets', () => {
     expect(loaded['id-1'].workState).toBe('idle')
     expect(loaded['id-1'].workStartedAt).toBeNull()
     expect(loaded['id-1'].workError).toBeNull()
+    expect(loaded['id-1'].useSessionMemory).toBe(false)
   })
 
   it('returns empty object on invalid JSON', () => {
@@ -69,6 +70,7 @@ describe('createTicket', () => {
     const result = createTicket(store, {
       title: 'New ticket',
       description: 'Do the thing',
+      useSessionMemory: true,
       status: 'backlog',
       priority: 'medium',
       assigneeId: null,
@@ -79,6 +81,7 @@ describe('createTicket', () => {
     expect(ticket).toBeDefined()
     expect(ticket.title).toBe('New ticket')
     expect(ticket.status).toBe('backlog')
+    expect(ticket.useSessionMemory).toBe(true)
     expect(ticket.id).toBe('test-uuid-1')
     expect(ticket.createdAt).toBeTypeOf('number')
     expect(ticket.updatedAt).toBe(ticket.createdAt)
@@ -90,6 +93,7 @@ describe('createTicket', () => {
         id: 'existing',
         title: 'Existing',
         description: '',
+        useSessionMemory: false,
         status: 'todo',
         priority: 'low',
         assigneeId: null,
@@ -102,6 +106,7 @@ describe('createTicket', () => {
     const result = createTicket(store, {
       title: 'New',
       description: '',
+      useSessionMemory: false,
       status: 'backlog',
       priority: 'medium',
       assigneeId: null,
@@ -118,6 +123,7 @@ describe('updateTicket', () => {
       id: 't1',
       title: 'Original',
       description: 'Desc',
+      useSessionMemory: false,
       status: 'backlog',
       priority: 'low',
       assigneeId: null,
@@ -148,6 +154,7 @@ describe('moveTicket', () => {
         id: 't1',
         title: 'Task',
         description: '',
+        useSessionMemory: false,
         status: 'backlog',
         priority: 'medium',
         assigneeId: null,
@@ -169,6 +176,7 @@ describe('deleteTicket', () => {
         id: 't1',
         title: 'Task',
         description: '',
+        useSessionMemory: false,
         status: 'backlog',
         priority: 'medium',
         assigneeId: null,
@@ -186,12 +194,12 @@ describe('deleteTicket', () => {
     const store: KanbanStore = {
       't1': {
         id: 't1', title: 'A', description: '', status: 'backlog',
-        priority: 'low', assigneeId: null, assigneeRole: null,
+        useSessionMemory: false, priority: 'low', assigneeId: null, assigneeRole: null,
         ...WORK_DEFAULTS, createdAt: 1000, updatedAt: 1000,
       },
       't2': {
         id: 't2', title: 'B', description: '', status: 'todo',
-        priority: 'high', assigneeId: null, assigneeRole: null,
+        useSessionMemory: false, priority: 'high', assigneeId: null, assigneeRole: null,
         ...WORK_DEFAULTS, createdAt: 2000, updatedAt: 2000,
       },
     }
@@ -205,17 +213,17 @@ describe('getTicketsByStatus', () => {
   const store: KanbanStore = {
     't1': {
       id: 't1', title: 'Old', description: '', status: 'backlog',
-      priority: 'low', assigneeId: null, assigneeRole: null,
+      useSessionMemory: false, priority: 'low', assigneeId: null, assigneeRole: null,
       ...WORK_DEFAULTS, createdAt: 1000, updatedAt: 1000,
     },
     't2': {
       id: 't2', title: 'New', description: '', status: 'backlog',
-      priority: 'medium', assigneeId: null, assigneeRole: null,
+      useSessionMemory: false, priority: 'medium', assigneeId: null, assigneeRole: null,
       ...WORK_DEFAULTS, createdAt: 2000, updatedAt: 3000,
     },
     't3': {
       id: 't3', title: 'Other', description: '', status: 'todo',
-      priority: 'high', assigneeId: null, assigneeRole: null,
+      useSessionMemory: false, priority: 'high', assigneeId: null, assigneeRole: null,
       ...WORK_DEFAULTS, createdAt: 1500, updatedAt: 1500,
     },
   }

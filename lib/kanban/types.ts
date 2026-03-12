@@ -12,6 +12,7 @@ export interface KanbanTicket {
   id: string
   title: string
   description: string
+  useSessionMemory: boolean
   status: TicketStatus
   priority: TicketPriority
   assigneeId: string | null   // agent id from agents.json

@@ -91,6 +91,7 @@ export async function executeWork(
         ticket: {
           title: ticket.title,
           description: ticket.description,
+          useSessionMemory: ticket.useSessionMemory,
           status: ticket.status,
           priority: ticket.priority,
           assigneeRole: ticket.assigneeRole,

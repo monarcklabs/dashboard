@@ -3,9 +3,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { Maximize2, Minimize2 } from 'lucide-react'
 import type { Agent } from '@/lib/types'
-import type { KanbanTicket, TicketStatus, TicketPriority } from '@/lib/kanban/types'
+import type { KanbanTicket, TicketStatus, TicketPriority, TeamRole } from '@/lib/kanban/types'
 import { PRIORITY_COLORS, ROLE_LABELS, COLUMNS } from '@/lib/kanban/types'
 import { AgentAvatar } from '@/components/AgentAvatar'
+import { AgentPicker } from '@/components/kanban/AgentPicker'
 import { generateId } from '@/lib/id'
 import { exportAsPdf, exportAsDocx } from '@/lib/export-markdown'
 
@@ -143,38 +144,15 @@ function formatContent(content: string): React.ReactNode {
   return <>{result}</>
 }
 
-/* ── Priority badge ──────────────────────────────────── */
-
-function PriorityBadge({ priority }: { priority: TicketPriority }) {
-  return (
-    <span style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 'var(--space-1)',
-      fontSize: 'var(--text-caption2)',
-      fontWeight: 600,
-      color: PRIORITY_COLORS[priority],
-      textTransform: 'uppercase',
-      letterSpacing: '0.5px',
-    }}>
-      <span style={{
-        width: 6,
-        height: 6,
-        borderRadius: '50%',
-        background: PRIORITY_COLORS[priority],
-      }} />
-      {priority}
-    </span>
-  )
-}
-
 /* ── Main component ──────────────────────────────────── */
 
 interface TicketDetailPanelProps {
   ticket: KanbanTicket
   agent: Agent | null
+  agents: Agent[]
   onClose: () => void
   onStatusChange: (status: TicketStatus) => void
+  onUpdateTicket: (updates: Partial<KanbanTicket>) => void
   onDelete: () => void
   onRetryWork?: () => void
 }
@@ -182,21 +160,37 @@ interface TicketDetailPanelProps {
 export function TicketDetailPanel({
   ticket,
   agent,
+  agents,
   onClose,
   onStatusChange,
+  onUpdateTicket,
   onDelete,
   onRetryWork,
 }: TicketDetailPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
+  const [titleDraft, setTitleDraft] = useState(ticket.title)
   const [isStreaming, setIsStreaming] = useState(false)
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(true)
   const [mdModalContent, setMdModalContent] = useState<string | null>(null)
   const [googleDriveEnabled, setGoogleDriveEnabled] = useState(false)
   const [googleDocExporting, setGoogleDocExporting] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
+  const assigneeEditable = ticket.status === 'backlog' || ticket.status === 'todo'
+  const roleOptions: TeamRole[] = ['lead-dev', 'ux-ui', 'qa']
+
+  const updateAssignee = useCallback((agentId: string) => {
+    onUpdateTicket({
+      assigneeId: agentId || null,
+      assigneeRole: agentId ? ticket.assigneeRole : null,
+    })
+  }, [onUpdateTicket, ticket.assigneeRole])
+
+  useEffect(() => {
+    setTitleDraft(ticket.title)
+  }, [ticket.id, ticket.title])
 
   // Check Google Drive integration status
   useEffect(() => {
@@ -355,6 +349,7 @@ export function TicketDetailPanel({
           ticket: {
             title: ticket.title,
             description: ticket.description,
+            useSessionMemory: ticket.useSessionMemory,
             status: ticket.status,
             priority: ticket.priority,
             assigneeRole: ticket.assigneeRole,
@@ -525,16 +520,28 @@ export function TicketDetailPanel({
 
           {/* Title + meta */}
           <div style={{ padding: 'var(--space-2) var(--space-5) var(--space-4)' }}>
-            <h2 style={{
-              fontSize: 'var(--text-title3)',
-              fontWeight: 700,
-              letterSpacing: '-0.3px',
-              color: 'var(--text-primary)',
-              margin: 0,
-              lineHeight: 1.25,
-            }}>
-              {ticket.title}
-            </h2>
+            <input
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={() => {
+                const nextTitle = titleDraft.trim()
+                setTitleDraft(nextTitle || ticket.title)
+                if (nextTitle && nextTitle !== ticket.title) {
+                  onUpdateTicket({ title: nextTitle })
+                }
+              }}
+              className="apple-input focus-ring"
+              aria-label="Ticket title"
+              style={{
+                width: '100%',
+                fontSize: 'var(--text-title3)',
+                fontWeight: 700,
+                letterSpacing: '-0.3px',
+                color: 'var(--text-primary)',
+                lineHeight: 1.25,
+                padding: '10px 12px',
+              }}
+            />
 
             <div style={{
               display: 'flex',
@@ -586,67 +593,200 @@ export function TicketDetailPanel({
                   ▼
                 </span>
               </label>
-              <PriorityBadge priority={ticket.priority} />
+              <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                {(['low', 'medium', 'high'] as TicketPriority[]).map((priority) => {
+                  const isSelected = ticket.priority === priority
+                  return (
+                    <button
+                      key={priority}
+                      type="button"
+                      className="focus-ring"
+                      onClick={() => onUpdateTicket({ priority })}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 'var(--space-1)',
+                        padding: '5px 10px',
+                        borderRadius: 'var(--radius-sm)',
+                        border: isSelected ? `1px solid ${PRIORITY_COLORS[priority]}` : '1px solid var(--separator)',
+                        background: isSelected ? 'var(--fill-tertiary)' : 'transparent',
+                        color: isSelected ? PRIORITY_COLORS[priority] : 'var(--text-tertiary)',
+                        cursor: 'pointer',
+                        textTransform: 'uppercase',
+                        fontSize: 'var(--text-caption2)',
+                        fontWeight: 600,
+                        letterSpacing: '0.3px',
+                      }}
+                    >
+                      <span style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: PRIORITY_COLORS[priority],
+                      }} />
+                      {priority}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
 
             {/* Assignee */}
-            {agent ? (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--space-2)',
-                marginTop: 'var(--space-3)',
-                fontSize: 'var(--text-footnote)',
-                color: 'var(--text-secondary)',
-              }}>
-                <AgentAvatar agent={agent} size={24} borderRadius={7} />
-                <span>{agent.name}</span>
-                {ticket.assigneeRole && (
-                  <span style={{ color: 'var(--text-tertiary)' }}>
-                    ({ROLE_LABELS[ticket.assigneeRole]})
-                  </span>
-                )}
-              </div>
-            ) : (
-              <div style={{
-                marginTop: 'var(--space-3)',
-                fontSize: 'var(--text-footnote)',
-                color: 'var(--text-tertiary)',
-                fontStyle: 'italic',
-              }}>
-                Unassigned
-              </div>
-            )}
-          </div>
-
-          {/* Description */}
-          {ticket.description && (
-            <div style={{ padding: '0 var(--space-5) var(--space-4)' }}>
-              <div style={{
-                height: 1,
-                background: 'var(--separator)',
-                marginBottom: 'var(--space-3)',
-              }} />
+            <div style={{ marginTop: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               <div style={{
                 fontSize: 'var(--text-caption1)',
                 fontWeight: 600,
                 color: 'var(--text-tertiary)',
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px',
-                marginBottom: 'var(--space-2)',
               }}>
-                Description
+                Assignment
               </div>
-              <div style={{
+              {assigneeEditable ? (
+                <>
+                  <AgentPicker
+                    agents={agents}
+                    value={ticket.assigneeId || ''}
+                    onChange={updateAssignee}
+                  />
+                  {ticket.assigneeId && (
+                    <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                      {roleOptions.map((role) => {
+                        const isSelected = ticket.assigneeRole === role
+                        return (
+                          <button
+                            key={role}
+                            type="button"
+                            className="focus-ring"
+                            onClick={() => onUpdateTicket({ assigneeRole: isSelected ? null : role })}
+                            style={{
+                              padding: '6px 10px',
+                              borderRadius: 'var(--radius-sm)',
+                              border: isSelected ? '1px solid var(--accent)' : '1px solid var(--separator)',
+                              background: isSelected ? 'var(--accent-fill)' : 'transparent',
+                              color: isSelected ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                              cursor: 'pointer',
+                              fontSize: 'var(--text-caption2)',
+                              fontWeight: 600,
+                            }}
+                          >
+                            {ROLE_LABELS[role]}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {agent ? (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--space-2)',
+                      fontSize: 'var(--text-footnote)',
+                      color: 'var(--text-secondary)',
+                    }}>
+                      <AgentAvatar agent={agent} size={24} borderRadius={7} />
+                      <span>{agent.name}</span>
+                      {ticket.assigneeRole && (
+                        <span style={{ color: 'var(--text-tertiary)' }}>
+                          ({ROLE_LABELS[ticket.assigneeRole]})
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{
+                      fontSize: 'var(--text-footnote)',
+                      color: 'var(--text-tertiary)',
+                      fontStyle: 'italic',
+                    }}>
+                      Unassigned
+                    </div>
+                  )}
+                  <div style={{
+                    fontSize: 'var(--text-caption2)',
+                    color: 'var(--text-tertiary)',
+                    lineHeight: 1.4,
+                  }}>
+                    Assignee and role can only be changed while the ticket is in Backlog or To Do.
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Description */}
+          <div style={{ padding: '0 var(--space-5) var(--space-4)' }}>
+            <div style={{
+              height: 1,
+              background: 'var(--separator)',
+              marginBottom: 'var(--space-3)',
+            }} />
+            <div style={{
+              fontSize: 'var(--text-caption1)',
+              fontWeight: 600,
+              color: 'var(--text-tertiary)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              marginBottom: 'var(--space-2)',
+            }}>
+              Description
+            </div>
+            <textarea
+              value={ticket.description}
+              onChange={(e) => onUpdateTicket({ description: e.target.value })}
+              className="apple-input focus-ring"
+              placeholder="Add details..."
+              aria-label="Ticket description"
+              rows={4}
+              style={{
+                width: '100%',
                 fontSize: 'var(--text-footnote)',
                 color: 'var(--text-secondary)',
                 lineHeight: 1.5,
-                whiteSpace: 'pre-wrap',
-              }}>
-                {ticket.description}
-              </div>
-            </div>
-          )}
+                resize: 'vertical',
+                minHeight: 96,
+              }}
+            />
+          </div>
+
+          <div style={{ padding: '0 var(--space-5) var(--space-4)' }}>
+            <div style={{
+              height: 1,
+              background: 'var(--separator)',
+              marginBottom: 'var(--space-3)',
+            }} />
+            <label style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 'var(--space-3)',
+              cursor: 'pointer',
+            }}>
+              <input
+                type="checkbox"
+                checked={ticket.useSessionMemory}
+                onChange={(e) => onUpdateTicket({ useSessionMemory: e.target.checked })}
+                style={{ marginTop: 2 }}
+              />
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{
+                  fontSize: 'var(--text-caption1)',
+                  fontWeight: 600,
+                  color: 'var(--text-primary)',
+                }}>
+                  Allow session memory
+                </span>
+                <span style={{
+                  fontSize: 'var(--text-caption2)',
+                  color: 'var(--text-tertiary)',
+                  lineHeight: 1.4,
+                }}>
+                  When enabled, the agent may rely on prior hidden session context and treat this as a continuation.
+                </span>
+              </span>
+            </label>
+          </div>
 
           {/* Agent work result */}
           {ticket.workResult && (

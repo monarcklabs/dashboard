@@ -22,6 +22,7 @@ function sanitizeTicket(id: string, raw: Record<string, unknown>): KanbanTicket 
     id,
     title: raw.title as string,
     description: typeof raw.description === 'string' ? raw.description : '',
+    useSessionMemory: raw.useSessionMemory === true,
     status,
     priority,
     assigneeId: typeof raw.assigneeId === 'string' ? raw.assigneeId : null,

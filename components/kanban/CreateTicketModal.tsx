@@ -21,6 +21,7 @@ interface CreateTicketModalProps {
   onSubmit: (ticket: {
     title: string
     description: string
+    useSessionMemory: boolean
     priority: TicketPriority
     assigneeId: string | null
     assigneeRole: TeamRole | null
@@ -39,6 +40,7 @@ const ROLES: TeamRole[] = ['lead-dev', 'ux-ui', 'qa']
 const initialState = {
   title: '',
   description: '',
+  useSessionMemory: false,
   priority: 'medium' as TicketPriority,
   assigneeId: '' as string,
   assigneeRole: null as TeamRole | null,
@@ -68,6 +70,7 @@ export function CreateTicketModal({
     onSubmit({
       title: form.title.trim(),
       description: form.description.trim(),
+      useSessionMemory: form.useSessionMemory,
       priority: form.priority,
       assigneeId: form.assigneeId || null,
       assigneeRole: form.assigneeId ? form.assigneeRole : null,
@@ -174,6 +177,46 @@ export function CreateTicketModal({
               }}
             />
           </div>
+
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 'var(--space-3)',
+              padding: 'var(--space-3)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--separator)',
+              background: 'var(--fill-quaternary)',
+              cursor: 'pointer',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={form.useSessionMemory}
+              onChange={(e) => setForm((f) => ({ ...f, useSessionMemory: e.target.checked }))}
+              style={{ marginTop: 2 }}
+            />
+            <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span
+                style={{
+                  fontSize: 'var(--text-caption1)',
+                  fontWeight: 'var(--weight-medium)',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                Allow session memory
+              </span>
+              <span
+                style={{
+                  fontSize: 'var(--text-caption2)',
+                  color: 'var(--text-tertiary)',
+                  lineHeight: 1.4,
+                }}
+              >
+                Let the agent rely on prior hidden session context for continuation tickets.
+              </span>
+            </span>
+          </label>
 
           {/* Priority */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>

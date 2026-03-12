@@ -128,6 +128,7 @@ export default function KanbanPage() {
   function handleCreateTicket(data: {
     title: string
     description: string
+    useSessionMemory: boolean
     priority: TicketPriority
     assigneeId: string | null
     assigneeRole: TeamRole | null
@@ -369,8 +370,10 @@ export default function KanbanPage() {
         <TicketDetailPanel
           ticket={selectedTicket}
           agent={selectedAgent}
+          agents={agents}
           onClose={() => setSelectedTicket(null)}
           onStatusChange={(status) => handleMoveTicket(selectedTicket.id, status)}
+          onUpdateTicket={(updates) => handleUpdateTicket(selectedTicket.id, updates)}
           onDelete={() => handleDeleteTicket(selectedTicket.id)}
           onRetryWork={() => handleRetryWork(selectedTicket.id)}
         />
