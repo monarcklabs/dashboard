@@ -16,6 +16,15 @@ interface UseAgentWorkOptions {
   onUpdateTicket: (ticketId: string, updates: Partial<KanbanTicket>) => void
 }
 
+export function getFailedWorkUpdates(error: string): Partial<KanbanTicket> {
+  return {
+    status: 'todo',
+    workState: 'failed',
+    workStartedAt: null,
+    workError: error || 'Agent work failed',
+  }
+}
+
 async function tryAcquireLock(ticketId: string): Promise<boolean> {
   try {
     const res = await fetch('/api/kanban/work-lock', {
@@ -109,14 +118,12 @@ export function useAgentWork({ tickets, onUpdateTicket }: UseAgentWorkOptions) {
       onUpdateTicket(id, {
         status: nextStatus,
         workState: 'done',
+        workStartedAt: null,
         workResult: parsed.content,
         workError: persisted ? null : 'Saved work result, but chat history did not persist.',
       })
     } else {
-      onUpdateTicket(id, {
-        workState: 'failed',
-        workError: result.error || 'Agent work failed',
-      })
+      onUpdateTicket(id, getFailedWorkUpdates(result.error || 'Agent work failed'))
     }
 
     activeWork.current.delete(id)
@@ -135,10 +142,10 @@ export function useAgentWork({ tickets, onUpdateTicket }: UseAgentWorkOptions) {
         now - ticket.workStartedAt > STALE_THRESHOLD_MS &&
         !activeWork.current.has(ticket.id)
       ) {
-        onUpdateTicket(ticket.id, {
-          workState: 'failed',
-          workError: 'Agent work appears stuck (no response received). You can retry.',
-        })
+        onUpdateTicket(
+          ticket.id,
+          getFailedWorkUpdates('Agent work appears stuck (no response received). You can retry.'),
+        )
       }
     }
   }, [tickets, onUpdateTicket])

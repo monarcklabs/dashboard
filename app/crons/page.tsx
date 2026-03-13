@@ -308,6 +308,134 @@ function ErrorsBanners({
   );
 }
 
+/* ─── Recent Activity (all jobs) ─────────────────────────────── */
+
+function RecentActivity({
+  crons,
+  agentMap,
+}: {
+  crons: CronJob[];
+  agentMap: Map<string, Agent>;
+}) {
+  const [runs, setRuns] = useState<CronRun[] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/cron-runs")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        setRuns((data as CronRun[]).slice(0, 10));
+        setLoading(false);
+      })
+      .catch(() => {
+        setRuns([]);
+        setLoading(false);
+      });
+  }, []);
+
+  return (
+    <div
+      style={{
+        background: "var(--material-regular)",
+        border: "1px solid var(--separator)",
+        borderRadius: "var(--radius-md)",
+        padding: "var(--space-4)",
+        marginBottom: "var(--space-4)",
+      }}
+    >
+      <div style={{ marginBottom: "var(--space-3)" }}>
+        <div style={{ fontSize: "var(--text-footnote)", color: "var(--text-primary)", fontWeight: "var(--weight-semibold)" }}>
+          Recent Activity
+        </div>
+        <div style={{ fontSize: "var(--text-caption1)", color: "var(--text-tertiary)", marginTop: 2 }}>
+          Latest cron summaries and failures across all scheduled jobs
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} style={{ height: 20, width: "100%" }} />
+          ))}
+        </div>
+      ) : !runs || runs.length === 0 ? (
+        <div style={{ fontSize: "var(--text-caption1)", color: "var(--text-tertiary)" }}>
+          No recent cron activity yet
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+          {runs.map((run, index) => {
+            const cron = crons.find((item) => item.id === run.jobId);
+            const agent = cron?.agentId ? agentMap.get(cron.agentId) : null;
+            const isError = run.status === "error";
+            const text = isError
+              ? run.error || "Run failed"
+              : run.summary || "Run completed";
+
+            return (
+              <div
+                key={`${run.jobId}-${run.ts}-${index}`}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "auto 1fr auto",
+                  gap: "var(--space-2)",
+                  alignItems: "start",
+                  paddingBottom: index < runs.length - 1 ? "var(--space-2)" : 0,
+                  borderBottom: index < runs.length - 1 ? "1px solid var(--separator)" : "none",
+                }}
+              >
+                <span
+                  className={`flex-shrink-0 rounded-full ${isError ? "animate-error-pulse" : ""}`}
+                  style={{
+                    width: 8,
+                    height: 8,
+                    marginTop: 6,
+                    background: isError ? "var(--system-red)" : "var(--system-green)",
+                  }}
+                />
+                <div style={{ minWidth: 0 }}>
+                  <div className="flex items-center flex-wrap" style={{ gap: "var(--space-2)" }}>
+                    <span style={{ fontSize: "var(--text-caption1)", color: "var(--text-primary)", fontWeight: "var(--weight-semibold)" }}>
+                      {cron?.name || run.jobId}
+                    </span>
+                    {agent && (
+                      <Link
+                        href={`/chat/${agent.id}`}
+                        style={{ fontSize: "var(--text-caption2)", color: "var(--system-blue)", textDecoration: "none" }}
+                      >
+                        {agent.name}
+                      </Link>
+                    )}
+                    {run.deliveryStatus && (
+                      <span style={{ fontSize: "var(--text-caption2)", color: "var(--text-tertiary)" }}>
+                        Delivery {run.deliveryStatus}
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "var(--text-caption1)",
+                      color: isError ? "var(--system-red)" : "var(--text-secondary)",
+                      marginTop: 2,
+                      lineHeight: "var(--leading-relaxed)",
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {text}
+                  </div>
+                </div>
+                <div style={{ fontSize: "var(--text-caption2)", color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>
+                  {timeAgo(new Date(run.ts).toISOString())}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Recent Runs (lazy-loaded) ──────────────────────────────── */
 
 function RecentRuns({ jobId }: { jobId: string }) {
@@ -602,6 +730,8 @@ export default function CronsPage() {
 
                 {/* Categorized error banners */}
                 <ErrorsBanners crons={crons} agentMap={agentMap} onCopy={copyError} copiedId={copiedId} />
+
+                <RecentActivity crons={crons} agentMap={agentMap} />
 
                 {/* Filter pills */}
                 <div

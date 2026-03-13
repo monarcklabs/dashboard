@@ -168,15 +168,16 @@ describe('executeWork', () => {
   })
 
   it('returns error on non-ok response', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: false,
-      status: 500,
-      body: null,
-    }))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: 'plain failure' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    ))
 
     const result = await executeWork('agent-1', makeTicket())
     expect(result.success).toBe(false)
-    expect(result.error).toContain('500')
+    expect(result.error).toBe('plain failure')
   })
 
   it('returns error on empty response', async () => {
@@ -194,7 +195,15 @@ describe('executeWork', () => {
 
     const result = await executeWork('agent-1', makeTicket())
     expect(result.success).toBe(false)
-    expect(result.error).toContain('Empty response')
+    expect(result.error).toBe('Agent runtime did not return a response.')
+  })
+
+  it('returns error when the response body is missing', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 200 })))
+
+    const result = await executeWork('agent-1', makeTicket())
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('Agent runtime did not return a response.')
   })
 
   it('returns error on network failure', async () => {
@@ -202,7 +211,7 @@ describe('executeWork', () => {
 
     const result = await executeWork('agent-1', makeTicket())
     expect(result.success).toBe(false)
-    expect(result.error).toBe('Network down')
+    expect(result.error).toBe('Chat failed. Make sure OpenClaw gateway is running.')
   })
 
   it('skips malformed SSE chunks gracefully', async () => {

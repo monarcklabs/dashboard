@@ -399,6 +399,10 @@ export function TicketDetailPanel({
         }
       }
 
+      if (!fullContent.trim()) {
+        throw new Error('Agent runtime did not return a response.')
+      }
+
       const finalContent = fullContent
       setMessages(prev =>
         prev.map(m => m.id === assistantMsgId

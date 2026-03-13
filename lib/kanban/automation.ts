@@ -2,6 +2,7 @@
 
 import type { KanbanTicket, TeamRole } from './types'
 import { generateId } from '../id'
+import { humanizeKanbanChatError, readKanbanChatErrorResponse } from './chat-errors'
 
 export type WorkDisposition = 'completed' | 'needs_input' | 'working'
 
@@ -109,6 +110,7 @@ interface WorkResult {
 }
 
 const WORK_TIMEOUT_MS = 120_000 // 2 minutes
+const EMPTY_RUNTIME_RESPONSE_ERROR = 'Agent runtime did not return a response.'
 
 export async function executeWork(
   agentId: string,
@@ -149,9 +151,18 @@ export async function executeWork(
       }),
     })
 
-    if (!res.ok || !res.body) {
+    if (!res.ok) {
       clearTimeout(timeoutId)
-      return { success: false, content: '', error: `API error: ${res.status}` }
+      return {
+        success: false,
+        content: '',
+        error: await readKanbanChatErrorResponse(res),
+      }
+    }
+
+    if (!res.body) {
+      clearTimeout(timeoutId)
+      return { success: false, content: '', error: EMPTY_RUNTIME_RESPONSE_ERROR }
     }
 
     const reader = res.body.getReader()
@@ -173,7 +184,11 @@ export async function executeWork(
             try {
               const chunk = JSON.parse(line.slice(6))
               if (chunk.error) {
-                return { success: false, content: fullContent, error: `Stream error: ${chunk.error}` }
+                return {
+                  success: false,
+                  content: fullContent,
+                  error: humanizeKanbanChatError(chunk.error),
+                }
               }
               if (chunk.content) {
                 fullContent += chunk.content
@@ -187,8 +202,8 @@ export async function executeWork(
       clearTimeout(timeoutId)
     }
 
-    if (!fullContent) {
-      return { success: false, content: '', error: 'Empty response from agent' }
+    if (!fullContent.trim()) {
+      return { success: false, content: '', error: EMPTY_RUNTIME_RESPONSE_ERROR }
     }
 
     return { success: true, content: fullContent }
@@ -196,8 +211,11 @@ export async function executeWork(
     if (err instanceof DOMException && err.name === 'AbortError') {
       return { success: false, content: '', error: 'Agent work timed out' }
     }
-    const message = err instanceof Error ? err.message : 'Unknown error'
-    return { success: false, content: '', error: message }
+    return {
+      success: false,
+      content: '',
+      error: humanizeKanbanChatError(err),
+    }
   }
 }
 
