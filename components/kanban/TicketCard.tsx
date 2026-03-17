@@ -36,6 +36,7 @@ interface TicketCardProps {
 
 export function TicketCard({ ticket, agent, onClick, isWorking }: TicketCardProps) {
   const [isDragging, setIsDragging] = useState(false)
+  const relevantFiles = ticket.relevantFiles ?? []
 
   function handleDragStart(e: React.DragEvent<HTMLDivElement>) {
     e.dataTransfer.setData('text/plain', ticket.id)
@@ -190,9 +191,9 @@ export function TicketCard({ ticket, agent, onClick, isWorking }: TicketCardProp
           </span>
         )}
 
-        {ticket.relevantFiles.length > 0 && (
+        {relevantFiles.length > 0 && (
           <span
-            title={ticket.relevantFiles.map((f) => f.name).join(', ')}
+            title={relevantFiles.map((f) => f.name).join(', ')}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -201,7 +202,7 @@ export function TicketCard({ ticket, agent, onClick, isWorking }: TicketCardProp
               color: 'var(--text-tertiary)',
             }}
           >
-            {'\u{1F4CE}'} {ticket.relevantFiles.length}
+            {'\u{1F4CE}'} {relevantFiles.length}
           </span>
         )}
 

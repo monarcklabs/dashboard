@@ -61,8 +61,9 @@ export function getWorkPrompt(ticket: KanbanTicket): string {
     ? ROLE_PROMPTS[ticket.assigneeRole] ?? FALLBACK_PROMPT
     : FALLBACK_PROMPT
 
-  const filesBlock = ticket.relevantFiles.length > 0
-    ? `\nRelevant files:\n${ticket.relevantFiles.map((f) => f.url ? `- "${f.name}" (${f.url})` : `- "${f.name}"`).join('\n')}`
+  const relevantFiles = ticket.relevantFiles ?? []
+  const filesBlock = relevantFiles.length > 0
+    ? `\nRelevant files:\n${relevantFiles.map((f) => f.url ? `- "${f.name}" (${f.url})` : `- "${f.name}"`).join('\n')}`
     : ''
 
   return `${rolePrompt}${WORKFLOW_STATUS_INSTRUCTIONS}

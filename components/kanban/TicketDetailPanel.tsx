@@ -57,6 +57,7 @@ export function TicketDetailPanel({
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
+  const relevantFiles = ticket.relevantFiles ?? []
   const assigneeEditable = ticket.status === 'backlog' || ticket.status === 'todo'
   const roleOptions: TeamRole[] = ['lead-dev', 'ux-ui', 'qa']
 
@@ -644,7 +645,7 @@ export function TicketDetailPanel({
           </div>
 
           {/* Relevant Files */}
-          {(googleDriveEnabled || ticket.relevantFiles.length > 0) && (
+          {(googleDriveEnabled || relevantFiles.length > 0) && (
             <div style={{ padding: '0 var(--space-5) var(--space-4)' }}>
               <div style={{
                 height: 1,
@@ -653,7 +654,7 @@ export function TicketDetailPanel({
               }} />
               {googleDriveEnabled ? (
                 <DriveFilePicker
-                  value={ticket.relevantFiles}
+                  value={relevantFiles}
                   onChange={(files) => onUpdateTicket({ relevantFiles: files })}
                 />
               ) : (
@@ -669,7 +670,7 @@ export function TicketDetailPanel({
                     Relevant Files
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-                    {ticket.relevantFiles.map((f) => (
+                    {relevantFiles.map((f) => (
                       <a
                         key={f.id}
                         href={f.url}
