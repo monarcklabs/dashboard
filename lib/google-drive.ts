@@ -33,6 +33,15 @@ export interface DriveFolderFile {
   modifiedTime: string
 }
 
+export interface DriveFolderItem {
+  id: string
+  name: string
+  mimeType: string
+  isFolder: boolean
+  url: string | null  // webViewLink for files, null for folders
+  modifiedTime: string
+}
+
 /**
  * List all files (non-recursive) in a Drive folder. Skips folders.
  */
@@ -55,6 +64,38 @@ export async function listFolderFiles(
     mimeType: f.mimeType ?? '',
     modifiedTime: f.modifiedTime ?? '',
   }))
+}
+
+/**
+ * List files AND folders (non-recursive) inside a Drive folder.
+ * Folders are returned first, then files, both sorted by name ascending.
+ * Pass folderId = 'root' to list My Drive root.
+ */
+export async function listFolderContents(
+  folderId: string,
+  config: GoogleWorkspaceConfig
+): Promise<DriveFolderItem[]> {
+  const auth = buildDriveAuth(config)
+  const drive = google.drive({ version: 'v3', auth })
+
+  const res = await drive.files.list({
+    q: `'${folderId}' in parents and trashed = false`,
+    fields: 'files(id, name, mimeType, webViewLink, modifiedTime)',
+    pageSize: 200,
+    orderBy: 'folder,name',
+  })
+
+  return (res.data.files ?? []).map((f) => {
+    const isFolder = f.mimeType === 'application/vnd.google-apps.folder'
+    return {
+      id: f.id ?? '',
+      name: f.name ?? '',
+      mimeType: f.mimeType ?? '',
+      isFolder,
+      url: isFolder ? null : (f.webViewLink ?? ''),
+      modifiedTime: f.modifiedTime ?? '',
+    }
+  })
 }
 
 const GOOGLE_EXPORT_MIME: Record<string, string> = {

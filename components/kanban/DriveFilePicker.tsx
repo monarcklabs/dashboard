@@ -16,6 +16,19 @@ interface DriveSearchResult {
   iconLink: string
 }
 
+interface DriveBrowseItem {
+  id: string
+  name: string
+  mimeType: string
+  isFolder: boolean
+  url: string | null
+}
+
+interface FolderCrumb {
+  id: string
+  name: string
+}
+
 const MIME_ICONS: Record<string, string> = {
   'application/vnd.google-apps.document': '\u{1F4DD}',   // memo (Docs)
   'application/vnd.google-apps.spreadsheet': '\u{1F4CA}', // bar chart (Sheets)
@@ -30,20 +43,33 @@ function fileIcon(mimeType: string): string {
 
 export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
   const [open, setOpen] = useState(false)
+  const [tab, setTab] = useState<'search' | 'browse'>('search')
+
+  // Search state
   const [search, setSearch] = useState('')
   const [results, setResults] = useState<DriveSearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [highlightIdx, setHighlightIdx] = useState(0)
+
+  // Browse state
+  const [folderStack, setFolderStack] = useState<FolderCrumb[]>([{ id: 'root', name: 'My Drive' }])
+  const [browseItems, setBrowseItems] = useState<DriveBrowseItem[]>([])
+  const [browseLoading, setBrowseLoading] = useState(false)
+  const [browseError, setBrowseError] = useState<string | null>(null)
+  const [browseHighlightIdx, setBrowseHighlightIdx] = useState(0)
+  const [browseRetry, setBrowseRetry] = useState(0)
+
   const containerRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const selectedIds = new Set(value.map((f) => f.id))
+  const currentFolder = folderStack[folderStack.length - 1]
 
   // Debounced search
   useEffect(() => {
-    if (!open) return
+    if (!open || tab !== 'search') return
 
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
@@ -66,17 +92,52 @@ export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [search, open])
+  }, [search, open, tab])
 
-  // Focus search when opening
+  // Browse fetch
   useEffect(() => {
-    if (open) {
+    if (!open || tab !== 'browse') return
+
+    setBrowseLoading(true)
+    setBrowseError(null)
+    setBrowseItems([])
+
+    const controller = new AbortController()
+
+    fetch(`/api/drive/folder?id=${currentFolder.id}`, { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then((data) => {
+        setBrowseItems(data.items ?? [])
+        setBrowseHighlightIdx(0)
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError') {
+          setBrowseError('Could not load folder contents')
+        }
+      })
+      .finally(() => setBrowseLoading(false))
+
+    return () => controller.abort()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, tab, currentFolder.id, browseRetry])
+
+  // Focus search when opening in search tab
+  useEffect(() => {
+    if (open && tab === 'search') {
       setTimeout(() => searchRef.current?.focus(), 0)
-    } else {
+    }
+    if (!open) {
       setSearch('')
       setResults([])
+      setTab('search')
+      setFolderStack([{ id: 'root', name: 'My Drive' }])
+      setBrowseItems([])
+      setBrowseError(null)
     }
-  }, [open])
+  }, [open, tab])
 
   // Close on outside click
   useEffect(() => {
@@ -94,16 +155,18 @@ export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
   useEffect(() => {
     if (!open || !listRef.current) return
     const items = listRef.current.querySelectorAll('[data-file-option]')
-    const item = items[highlightIdx]
+    const idx = tab === 'search' ? highlightIdx : browseHighlightIdx
+    const item = items[idx]
     if (item) item.scrollIntoView({ block: 'nearest' })
-  }, [highlightIdx, open])
+  }, [highlightIdx, browseHighlightIdx, open, tab])
 
-  // Reset highlight when results change
+  // Reset search highlight when results change
   useEffect(() => {
     setHighlightIdx(0)
   }, [results])
 
-  function toggleFile(file: DriveSearchResult) {
+  function toggleFile(file: { id: string; name: string; mimeType: string; url: string | null }) {
+    if (!file.url) return
     if (selectedIds.has(file.id)) {
       onChange(value.filter((f) => f.id !== file.id))
     } else {
@@ -113,6 +176,14 @@ export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
 
   function removeFile(fileId: string) {
     onChange(value.filter((f) => f.id !== fileId))
+  }
+
+  function navigateInto(item: DriveBrowseItem) {
+    setFolderStack((stack) => [...stack, { id: item.id, name: item.name }])
+  }
+
+  function navigateToCrumb(index: number) {
+    setFolderStack((stack) => stack.slice(0, index + 1))
   }
 
   const handleKeyDown = useCallback(
@@ -131,21 +202,43 @@ export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
         return
       }
 
-      if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        setHighlightIdx((i) => Math.min(i + 1, results.length - 1))
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        setHighlightIdx((i) => Math.max(i - 1, 0))
-      } else if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault()
-        if (results[highlightIdx]) {
-          toggleFile(results[highlightIdx])
+      if (tab === 'search') {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault()
+          setHighlightIdx((i) => Math.min(i + 1, results.length - 1))
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault()
+          setHighlightIdx((i) => Math.max(i - 1, 0))
+        } else if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          if (results[highlightIdx]) {
+            toggleFile(results[highlightIdx])
+          }
+        }
+      } else {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault()
+          setBrowseHighlightIdx((i) => Math.min(i + 1, browseItems.length - 1))
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault()
+          setBrowseHighlightIdx((i) => Math.max(i - 1, 0))
+        } else if (e.key === 'Enter') {
+          e.preventDefault()
+          const item = browseItems[browseHighlightIdx]
+          if (!item) return
+          if (item.isFolder) {
+            navigateInto(item)
+          } else {
+            toggleFile(item)
+          }
+        } else if (e.key === 'Backspace' && folderStack.length > 1) {
+          e.preventDefault()
+          setFolderStack((stack) => stack.slice(0, -1))
         }
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [open, highlightIdx, results, value],
+    [open, tab, highlightIdx, results, browseHighlightIdx, browseItems, folderStack, value],
   )
 
   return (
@@ -210,113 +303,217 @@ export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
               overflow: 'hidden',
             }}
           >
-            {/* Search */}
-            <div style={{ padding: '8px 8px 4px' }}>
-              <input
-                ref={searchRef}
-                type="text"
-                placeholder="Search Drive files..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="focus-ring"
-                style={{
-                  width: '100%',
-                  padding: '6px 10px',
-                  fontSize: 'var(--text-footnote)',
-                  border: '1px solid var(--separator)',
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'var(--fill-tertiary)',
-                  color: 'var(--text-primary)',
-                  outline: 'none',
-                }}
-              />
-            </div>
-
-            {/* Results list */}
+            {/* Tab bar */}
             <div
-              ref={listRef}
-              role="listbox"
-              aria-multiselectable="true"
               style={{
-                maxHeight: 280,
-                overflowY: 'auto',
-                padding: '4px',
+                display: 'flex',
+                borderBottom: '1px solid var(--separator)',
               }}
             >
-              {loading && (
-                <div
+              {(['search', 'browse'] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTab(t)}
                   style={{
-                    padding: 'var(--space-4)',
-                    textAlign: 'center',
+                    flex: 1,
+                    padding: '7px 0',
                     fontSize: 'var(--text-footnote)',
-                    color: 'var(--text-tertiary)',
+                    fontWeight: tab === t ? 'var(--weight-semibold)' : 'var(--weight-regular)',
+                    color: tab === t ? 'var(--accent)' : 'var(--text-tertiary)',
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: tab === t ? '2px solid var(--accent)' : '2px solid transparent',
+                    cursor: 'pointer',
+                    textTransform: 'capitalize',
+                    marginBottom: -1,
                   }}
                 >
-                  Searching...
+                  {t === 'search' ? 'Search' : 'Browse'}
+                </button>
+              ))}
+            </div>
+
+            {/* Search tab */}
+            {tab === 'search' && (
+              <>
+                <div style={{ padding: '8px 8px 4px' }}>
+                  <input
+                    ref={searchRef}
+                    type="text"
+                    placeholder="Search Drive files..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="focus-ring"
+                    style={{
+                      width: '100%',
+                      padding: '6px 10px',
+                      fontSize: 'var(--text-footnote)',
+                      border: '1px solid var(--separator)',
+                      borderRadius: 'var(--radius-sm)',
+                      background: 'var(--fill-tertiary)',
+                      color: 'var(--text-primary)',
+                      outline: 'none',
+                    }}
+                  />
                 </div>
-              )}
 
-              {!loading &&
-                results.map((file, i) => {
-                  const isHighlighted = highlightIdx === i
-                  const isSelected = selectedIds.has(file.id)
+                <div
+                  ref={listRef}
+                  role="listbox"
+                  aria-multiselectable="true"
+                  style={{ maxHeight: 280, overflowY: 'auto', padding: '4px' }}
+                >
+                  {loading && (
+                    <div style={emptyStyle}>Searching...</div>
+                  )}
 
-                  return (
-                    <div
-                      key={file.id}
-                      data-file-option
-                      role="option"
-                      aria-selected={isSelected}
-                      onClick={() => toggleFile(file)}
-                      onMouseEnter={() => setHighlightIdx(i)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 'var(--space-2)',
-                        padding: '8px 10px',
-                        borderRadius: 'var(--radius-sm)',
-                        cursor: 'pointer',
-                        background: isHighlighted ? 'var(--fill-secondary)' : 'transparent',
-                        transition: 'background 100ms',
-                      }}
-                    >
-                      <span style={{ fontSize: 16, flexShrink: 0 }}>{fileIcon(file.mimeType)}</span>
-                      <span
+                  {!loading &&
+                    results.map((file, i) => {
+                      const isHighlighted = highlightIdx === i
+                      const isSelected = selectedIds.has(file.id)
+
+                      return (
+                        <div
+                          key={file.id}
+                          data-file-option
+                          role="option"
+                          aria-selected={isSelected}
+                          onClick={() => toggleFile(file)}
+                          onMouseEnter={() => setHighlightIdx(i)}
+                          style={rowStyle(isHighlighted)}
+                        >
+                          <span style={{ fontSize: 16, flexShrink: 0 }}>{fileIcon(file.mimeType)}</span>
+                          <span style={nameStyle}>{file.name}</span>
+                          {isSelected && <span style={{ color: 'var(--accent)', fontSize: 13, flexShrink: 0 }}>&#10003;</span>}
+                        </div>
+                      )
+                    })}
+
+                  {!loading && results.length === 0 && (
+                    <div style={emptyStyle}>
+                      {search.trim() ? `No files match "${search}"` : 'Type to search Drive files'}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* Browse tab */}
+            {tab === 'browse' && (
+              <>
+                {/* Breadcrumb */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexWrap: 'nowrap',
+                    overflow: 'hidden',
+                    padding: '6px 10px',
+                    borderBottom: '1px solid var(--separator)',
+                    gap: 2,
+                  }}
+                >
+                  {folderStack.map((crumb, i) => {
+                    const isLast = i === folderStack.length - 1
+                    return (
+                      <span key={crumb.id} style={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
+                        {i > 0 && (
+                          <span style={{ color: 'var(--text-tertiary)', fontSize: 10, flexShrink: 0, padding: '0 2px' }}>›</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => !isLast && navigateToCrumb(i)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: 0,
+                            fontSize: 'var(--text-caption1)',
+                            color: isLast ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                            cursor: isLast ? 'default' : 'pointer',
+                            fontWeight: isLast ? 'var(--weight-medium)' : 'var(--weight-regular)',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            maxWidth: 120,
+                          }}
+                        >
+                          {crumb.name}
+                        </button>
+                      </span>
+                    )
+                  })}
+                </div>
+
+                {/* Folder contents */}
+                <div
+                  ref={listRef}
+                  role="listbox"
+                  aria-multiselectable="true"
+                  style={{ maxHeight: 280, overflowY: 'auto', padding: '4px' }}
+                >
+                  {browseLoading && <div style={emptyStyle}>Loading...</div>}
+
+                  {!browseLoading && browseError && (
+                    <div style={{ ...emptyStyle, color: 'var(--system-red, #ff453a)' }}>
+                      {browseError}{' '}
+                      <button
+                        type="button"
+                        onClick={() => setBrowseRetry((n) => n + 1)}
                         style={{
-                          flex: 1,
-                          minWidth: 0,
-                          fontSize: 'var(--text-footnote)',
-                          fontWeight: 'var(--weight-medium)',
-                          color: 'var(--text-primary)',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--accent)',
+                          fontSize: 'inherit',
+                          padding: 0,
+                          textDecoration: 'underline',
                         }}
                       >
-                        {file.name}
-                      </span>
-                      {isSelected && (
-                        <span style={{ color: 'var(--accent)', fontSize: 13, flexShrink: 0 }}>
-                          &#10003;
-                        </span>
-                      )}
+                        Retry
+                      </button>
                     </div>
-                  )
-                })}
+                  )}
 
-              {!loading && results.length === 0 && (
-                <div
-                  style={{
-                    padding: 'var(--space-4)',
-                    textAlign: 'center',
-                    fontSize: 'var(--text-footnote)',
-                    color: 'var(--text-tertiary)',
-                  }}
-                >
-                  {search.trim() ? `No files match "${search}"` : 'Type to search Drive files'}
+                  {!browseLoading && !browseError && browseItems.length === 0 && (
+                    <div style={emptyStyle}>This folder is empty</div>
+                  )}
+
+                  {!browseLoading && !browseError &&
+                    browseItems.map((item, i) => {
+                      const isHighlighted = browseHighlightIdx === i
+                      const isSelected = !item.isFolder && selectedIds.has(item.id)
+
+                      return (
+                        <div
+                          key={item.id}
+                          data-file-option
+                          role="option"
+                          aria-selected={isSelected}
+                          onClick={() => {
+                            if (item.isFolder) {
+                              navigateInto(item)
+                            } else {
+                              toggleFile(item)
+                            }
+                          }}
+                          onMouseEnter={() => setBrowseHighlightIdx(i)}
+                          style={rowStyle(isHighlighted)}
+                        >
+                          <span style={{ fontSize: 16, flexShrink: 0 }}>{fileIcon(item.mimeType)}</span>
+                          <span style={nameStyle}>{item.name}</span>
+                          {item.isFolder && (
+                            <span style={{ color: 'var(--text-tertiary)', fontSize: 11, flexShrink: 0, marginLeft: 'auto' }}>›</span>
+                          )}
+                          {!item.isFolder && isSelected && (
+                            <span style={{ color: 'var(--accent)', fontSize: 13, flexShrink: 0 }}>&#10003;</span>
+                          )}
+                        </div>
+                      )
+                    })}
                 </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -373,4 +570,36 @@ export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
       )}
     </div>
   )
+}
+
+// Shared style helpers
+function rowStyle(isHighlighted: boolean): React.CSSProperties {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 'var(--space-2)',
+    padding: '8px 10px',
+    borderRadius: 'var(--radius-sm)',
+    cursor: 'pointer',
+    background: isHighlighted ? 'var(--fill-secondary)' : 'transparent',
+    transition: 'background 100ms',
+  }
+}
+
+const nameStyle: React.CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  fontSize: 'var(--text-footnote)',
+  fontWeight: 'var(--weight-medium)',
+  color: 'var(--text-primary)',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+}
+
+const emptyStyle: React.CSSProperties = {
+  padding: 'var(--space-4)',
+  textAlign: 'center',
+  fontSize: 'var(--text-footnote)',
+  color: 'var(--text-tertiary)',
 }
