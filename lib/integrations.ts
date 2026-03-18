@@ -313,7 +313,12 @@ function readGoogleWorkspaceCredentialConfig(workspacePath: string | null): {
   const keyPath = typeof credentialConfig?.service_account_key_path === 'string'
     ? credentialConfig.service_account_key_path
     : join(openClawRoot, 'credentials', 'gw-sa.json')
-  const saJson = existsSync(keyPath) ? readFileSync(keyPath, 'utf-8') : null
+  const driveLibraryKeyPath = join(openClawRoot, 'credentials', 'drive-library-sa.json')
+  const saJson = existsSync(keyPath)
+    ? readFileSync(keyPath, 'utf-8')
+    : existsSync(driveLibraryKeyPath)
+      ? readFileSync(driveLibraryKeyPath, 'utf-8')
+      : null
   return {
     saJson,
     impersonateEmail: typeof credentialConfig?.impersonate_email === 'string'
