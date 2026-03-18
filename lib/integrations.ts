@@ -178,6 +178,12 @@ export interface GoogleWorkspaceConfig {
   impersonateEmail: string | null
 }
 
+interface DriveLibraryManifestConfig {
+  enabled: boolean
+  auth: string | null
+  folderId: string | null
+}
+
 /**
  * Check whether Google Drive integration is configured in the OpenClaw
  * workspace config (deployed by the Monarck admin panel).
@@ -192,11 +198,27 @@ export function getGoogleWorkspaceConfig(): GoogleWorkspaceConfig | null {
   const manifestEnabled = readManifestEnabled(manifest)
   const manifestMethod = readManifestMethod(manifest)
   const manifestIntegrations = readManifestIntegrations(manifest)
+  const manifestDriveLibrary = readManifestDriveLibrary(manifest)
+  const configDriveLibraryAuth =
+    typeof config?.drive_library_auth === 'string'
+      ? config.drive_library_auth
+      : null
+  const configDriveLibraryEnabled = config?.drive_library_enabled === true
+  const configDriveLibraryFolderId =
+    typeof config?.drive_library_folder_id === 'string'
+      ? config.drive_library_folder_id
+      : null
+  const driveLibraryDirectEnabled = (
+    (manifestDriveLibrary.enabled && !!manifestDriveLibrary.folderId && manifestDriveLibrary.auth !== null && manifestDriveLibrary.auth !== 'composio') ||
+    (configDriveLibraryEnabled && !!configDriveLibraryFolderId && configDriveLibraryAuth !== null && configDriveLibraryAuth !== 'composio')
+  )
 
   // Manifest state is what the Integrations UI reflects, so prefer it when
   // Google Workspace has been explicitly enabled there.
   const authMethod = manifestEnabled && manifestMethod
     ? manifestMethod
+    : driveLibraryDirectEnabled
+      ? 'gws_service_account'
     : typeof config?.google_auth_method === 'string'
       ? config.google_auth_method
       : manifestMethod || (credentialConfig.saJson ? 'gws_service_account' : 'composio')
@@ -209,7 +231,8 @@ export function getGoogleWorkspaceConfig(): GoogleWorkspaceConfig | null {
 
   const directGoogleEnabled = authMethod !== 'composio' && (
     integrations.includes('google_drive') ||
-    manifestEnabled
+    manifestEnabled ||
+    driveLibraryDirectEnabled
   )
 
   const hasUsableAuth = authMethod !== 'gws_service_account' || credentialConfig.saJson !== null
@@ -256,6 +279,15 @@ function readManifestIntegrations(manifest: Record<string, unknown> | null): str
   return Array.isArray(googleWorkspace?.integrations)
     ? (googleWorkspace.integrations as string[])
     : []
+}
+
+function readManifestDriveLibrary(manifest: Record<string, unknown> | null): DriveLibraryManifestConfig {
+  const driveLibrary = manifest && isRecord(manifest.drive_library) ? manifest.drive_library : null
+  return {
+    enabled: driveLibrary?.enabled === true,
+    auth: typeof driveLibrary?.auth === 'string' ? driveLibrary.auth : null,
+    folderId: typeof driveLibrary?.folder_id === 'string' ? driveLibrary.folder_id : null,
+  }
 }
 
 function readManifestImpersonateEmail(manifest: Record<string, unknown> | null): string | null {
