@@ -9,13 +9,13 @@ export interface DriveFile {
   iconLink: string
 }
 
-function buildDriveAuth(config: GoogleWorkspaceConfig) {
+function buildDriveAuth(config: GoogleWorkspaceConfig, { impersonate = true } = {}) {
   if (config.authMethod === 'gws_service_account' && config.saJson) {
     const credentials = JSON.parse(config.saJson)
     return new google.auth.GoogleAuth({
       credentials,
       scopes: ['https://www.googleapis.com/auth/drive.readonly'],
-      clientOptions: config.impersonateEmail
+      clientOptions: impersonate && config.impersonateEmail
         ? { subject: config.impersonateEmail }
         : undefined,
     })
@@ -49,7 +49,7 @@ export async function listFolderFiles(
   folderId: string,
   config: GoogleWorkspaceConfig
 ): Promise<DriveFolderFile[]> {
-  const auth = buildDriveAuth(config)
+  const auth = buildDriveAuth(config, { impersonate: false })
   const drive = google.drive({ version: 'v3', auth })
 
   const res = await drive.files.list({
@@ -75,7 +75,7 @@ export async function listFolderContents(
   folderId: string,
   config: GoogleWorkspaceConfig
 ): Promise<DriveFolderItem[]> {
-  const auth = buildDriveAuth(config)
+  const auth = buildDriveAuth(config, { impersonate: false })
   const drive = google.drive({ version: 'v3', auth })
 
   const res = await drive.files.list({
@@ -115,7 +115,7 @@ export async function downloadDriveFile(
   mimeType: string,
   config: GoogleWorkspaceConfig
 ): Promise<string | null> {
-  const auth = buildDriveAuth(config)
+  const auth = buildDriveAuth(config, { impersonate: false })
   const drive = google.drive({ version: 'v3', auth })
 
   const exportMime = GOOGLE_EXPORT_MIME[mimeType]
