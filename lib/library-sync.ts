@@ -79,7 +79,7 @@ function saveManifest(libDir: string, manifest: SyncManifest): void {
 /**
  * Extract a Google Drive folder ID from a URL or return as-is.
  */
-function extractDriveFolderIdFromUrl(url: string): string {
+export function extractDriveFolderIdFromUrl(url: string): string {
   try {
     const parsed = new URL(url)
     // https://drive.google.com/drive/folders/{id}

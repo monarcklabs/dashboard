@@ -51,8 +51,8 @@ export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
   const [loading, setLoading] = useState(false)
   const [highlightIdx, setHighlightIdx] = useState(0)
 
-  // Browse state
-  const [folderStack, setFolderStack] = useState<FolderCrumb[]>([{ id: 'root', name: 'My Drive' }])
+  // Browse state — id 'configured' is a sentinel meaning "use the server-resolved default folder"
+  const [folderStack, setFolderStack] = useState<FolderCrumb[]>([{ id: 'configured', name: 'Drive Folder' }])
   const [browseItems, setBrowseItems] = useState<DriveBrowseItem[]>([])
   const [browseLoading, setBrowseLoading] = useState(false)
   const [browseError, setBrowseError] = useState<string | null>(null)
@@ -94,7 +94,9 @@ export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
     }
   }, [search, open, tab])
 
-  // Browse fetch
+  // Browse fetch — omits ?id when at the sentinel root so the server resolves the
+  // configured library folder. On success, patches the folderStack entry with the
+  // real Drive folder ID returned in resolvedId.
   useEffect(() => {
     if (!open || tab !== 'browse') return
 
@@ -102,14 +104,20 @@ export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
     setBrowseError(null)
     setBrowseItems([])
 
+    const isConfiguredRoot = currentFolder.id === 'configured'
+    const url = isConfiguredRoot ? '/api/drive/folder' : `/api/drive/folder?id=${currentFolder.id}`
+
     const controller = new AbortController()
 
-    fetch(`/api/drive/folder?id=${currentFolder.id}`, { signal: controller.signal })
+    fetch(url, { signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.json()
       })
       .then((data) => {
+        if (isConfiguredRoot && data.resolvedId) {
+          setFolderStack([{ id: data.resolvedId, name: 'Drive Folder' }])
+        }
         setBrowseItems(data.items ?? [])
         setBrowseHighlightIdx(0)
       })
@@ -133,7 +141,7 @@ export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
       setSearch('')
       setResults([])
       setTab('search')
-      setFolderStack([{ id: 'root', name: 'My Drive' }])
+      setFolderStack([{ id: 'configured', name: 'Drive Folder' }])
       setBrowseItems([])
       setBrowseError(null)
     }
