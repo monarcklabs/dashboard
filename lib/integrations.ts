@@ -212,6 +212,14 @@ export function getGoogleWorkspaceConfig(): GoogleWorkspaceConfig | null {
     (manifestDriveLibrary.enabled && !!manifestDriveLibrary.folderId && manifestDriveLibrary.auth !== null && manifestDriveLibrary.auth !== 'composio') ||
     (configDriveLibraryEnabled && !!configDriveLibraryFolderId && configDriveLibraryAuth !== null && configDriveLibraryAuth !== 'composio')
   )
+  const driveLibrarySaJson =
+    typeof config?.drive_library_sa_json === 'string'
+      ? config.drive_library_sa_json
+      : null
+  const resolvedSaJson =
+    typeof config?.google_sa_json === 'string'
+      ? config.google_sa_json
+      : driveLibrarySaJson || credentialConfig.saJson
 
   // Manifest state is what the Integrations UI reflects, so prefer it when
   // Google Workspace has been explicitly enabled there.
@@ -235,17 +243,14 @@ export function getGoogleWorkspaceConfig(): GoogleWorkspaceConfig | null {
     driveLibraryDirectEnabled
   )
 
-  const hasUsableAuth = authMethod !== 'gws_service_account' || credentialConfig.saJson !== null
+  const hasUsableAuth = authMethod !== 'gws_service_account' || resolvedSaJson !== null
 
   if (!directGoogleEnabled || !hasUsableAuth) return null
 
   return {
     driveEnabled: true,
     authMethod,
-    saJson:
-      typeof config?.google_sa_json === 'string'
-        ? config.google_sa_json
-        : credentialConfig.saJson,
+    saJson: resolvedSaJson,
     impersonateEmail:
       typeof config?.google_impersonate_email === 'string'
         ? config.google_impersonate_email
