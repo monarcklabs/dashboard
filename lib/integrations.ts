@@ -189,18 +189,27 @@ export function getGoogleWorkspaceConfig(): GoogleWorkspaceConfig | null {
   const config = readConfig(configPath)
   const manifest = readIntegrationManifest(workspacePath)
   const credentialConfig = readGoogleWorkspaceCredentialConfig(workspacePath)
+  const manifestEnabled = readManifestEnabled(manifest)
+  const manifestMethod = readManifestMethod(manifest)
+  const manifestIntegrations = readManifestIntegrations(manifest)
 
-  const authMethod = typeof config?.google_auth_method === 'string'
-    ? config.google_auth_method
-    : readManifestMethod(manifest) || (credentialConfig.saJson ? 'gws_service_account' : 'composio')
+  // Manifest state is what the Integrations UI reflects, so prefer it when
+  // Google Workspace has been explicitly enabled there.
+  const authMethod = manifestEnabled && manifestMethod
+    ? manifestMethod
+    : typeof config?.google_auth_method === 'string'
+      ? config.google_auth_method
+      : manifestMethod || (credentialConfig.saJson ? 'gws_service_account' : 'composio')
 
-  const integrations = Array.isArray(config?.google_integrations)
-    ? (config.google_integrations as string[])
-    : readManifestIntegrations(manifest)
+  const integrations = manifestEnabled && manifestIntegrations.length > 0
+    ? manifestIntegrations
+    : Array.isArray(config?.google_integrations)
+      ? (config.google_integrations as string[])
+      : manifestIntegrations
 
   const directGoogleEnabled = authMethod !== 'composio' && (
     integrations.includes('google_drive') ||
-    readManifestEnabled(manifest)
+    manifestEnabled
   )
 
   const hasUsableAuth = authMethod !== 'gws_service_account' || credentialConfig.saJson !== null
