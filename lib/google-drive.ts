@@ -56,6 +56,8 @@ export async function listFolderFiles(
     q: `'${folderId}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'`,
     fields: 'files(id, name, mimeType, modifiedTime)',
     pageSize: 200,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   })
 
   return (res.data.files ?? []).map((f) => ({
@@ -83,6 +85,8 @@ export async function listFolderContents(
     fields: 'files(id, name, mimeType, webViewLink, modifiedTime)',
     pageSize: 200,
     orderBy: 'folder,name',
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   })
 
   return (res.data.files ?? []).map((f) => {
@@ -131,7 +135,7 @@ export async function downloadDriveFile(
   if (!isText) return null
 
   const res = await drive.files.get(
-    { fileId, alt: 'media' },
+    { fileId, alt: 'media', supportsAllDrives: true },
     { responseType: 'text' }
   )
   return typeof res.data === 'string' ? res.data : String(res.data)
@@ -158,6 +162,8 @@ export async function searchDriveFiles(query: string): Promise<DriveFile[]> {
     fields: 'files(id, name, mimeType, webViewLink, iconLink)',
     pageSize: 20,
     orderBy: 'viewedByMeTime desc',
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   })
 
   return (res.data.files ?? []).map((f) => ({
