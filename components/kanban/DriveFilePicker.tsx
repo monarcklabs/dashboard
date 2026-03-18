@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import type { RelevantFile } from '@/lib/kanban/types'
+import { generateId } from '@/lib/id'
 
 interface DriveFilePickerProps {
   value: RelevantFile[]
@@ -43,13 +44,17 @@ function fileIcon(mimeType: string): string {
 
 export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
   const [open, setOpen] = useState(false)
-  const [tab, setTab] = useState<'search' | 'browse'>('search')
+  const [tab, setTab] = useState<'search' | 'browse' | 'upload'>('search')
 
   // Search state
   const [search, setSearch] = useState('')
   const [results, setResults] = useState<DriveSearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [highlightIdx, setHighlightIdx] = useState(0)
+
+  // Upload state
+  const [dragOver, setDragOver] = useState(false)
+  const uploadInputRef = useRef<HTMLInputElement>(null)
 
   // Browse state — id 'configured' is a sentinel meaning "use the server-resolved default folder"
   const [folderStack, setFolderStack] = useState<FolderCrumb[]>([{ id: 'configured', name: 'Drive Folder' }])
@@ -120,7 +125,7 @@ export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
         if (isConfiguredRoot && data.resolvedId) {
           setFolderStack([{ id: data.resolvedId, name: 'Drive Folder' }])
         }
-        setBrowseItems(data.items ?? [])
+        setBrowseItems((data.items ?? []).filter((item: DriveBrowseItem) => !item.name.includes('_temp_export')))
         setBrowseHighlightIdx(0)
       })
       .catch((err: Error) => {
@@ -146,6 +151,7 @@ export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
       setFolderStack([{ id: 'configured', name: 'Drive Folder' }])
       setBrowseItems([])
       setBrowseError(null)
+      setDragOver(false)
     }
   }, [open, tab])
 
@@ -194,6 +200,25 @@ export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
 
   function navigateToCrumb(index: number) {
     setFolderStack((stack) => stack.slice(0, index + 1))
+  }
+
+  function handleUploadFiles(files: FileList | File[]) {
+    const fileArray = Array.from(files)
+    fileArray.forEach((file) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string
+        if (!dataUrl) return
+        const newFile: RelevantFile = {
+          id: `upload-${generateId()}`,
+          name: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          url: dataUrl,
+        }
+        onChange([...value.filter((f) => f.name !== file.name), newFile])
+      }
+      reader.readAsDataURL(file)
+    })
   }
 
   const handleKeyDown = useCallback(
@@ -320,7 +345,7 @@ export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
                 borderBottom: '1px solid var(--separator)',
               }}
             >
-              {(['search', 'browse'] as const).map((t) => (
+              {(['search', 'browse', 'upload'] as const).map((t) => (
                 <button
                   key={t}
                   type="button"
@@ -339,7 +364,7 @@ export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
                     marginBottom: -1,
                   }}
                 >
-                  {t === 'search' ? 'Search' : 'Browse'}
+                  {t === 'search' ? 'Search' : t === 'browse' ? 'Browse' : 'Upload'}
                 </button>
               ))}
             </div>
@@ -407,6 +432,55 @@ export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
                   )}
                 </div>
               </>
+            )}
+
+            {/* Upload tab */}
+            {tab === 'upload' && (
+              <div style={{ padding: '10px' }}>
+                <input
+                  ref={uploadInputRef}
+                  type="file"
+                  multiple
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    if (e.target.files?.length) {
+                      handleUploadFiles(e.target.files)
+                      e.target.value = ''
+                    }
+                  }}
+                />
+                <div
+                  onClick={() => uploadInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    setDragOver(false)
+                    if (e.dataTransfer.files.length) handleUploadFiles(e.dataTransfer.files)
+                  }}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 'var(--space-2)',
+                    padding: 'var(--space-5) var(--space-4)',
+                    borderRadius: 'var(--radius-md)',
+                    border: `2px dashed ${dragOver ? 'var(--accent)' : 'var(--separator)'}`,
+                    background: dragOver ? 'var(--accent-fill)' : 'var(--fill-quaternary)',
+                    cursor: 'pointer',
+                    transition: 'all 150ms var(--ease-smooth)',
+                  }}
+                >
+                  <span style={{ fontSize: 24 }}>📎</span>
+                  <span style={{ fontSize: 'var(--text-footnote)', fontWeight: 'var(--weight-medium)', color: 'var(--text-primary)' }}>
+                    Click or drop files here
+                  </span>
+                  <span style={{ fontSize: 'var(--text-caption2)', color: 'var(--text-tertiary)' }}>
+                    Any file type supported
+                  </span>
+                </div>
+              </div>
             )}
 
             {/* Browse tab */}

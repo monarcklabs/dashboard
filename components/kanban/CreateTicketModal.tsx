@@ -198,54 +198,72 @@ export function CreateTicketModal({
             />
           )}
 
-          <div
+          {/* Session memory */}
+          <label
             style={{
-              display: 'grid',
-              gridTemplateColumns: 'minmax(0, 1fr) auto',
-              alignItems: 'start',
+              display: 'flex',
+              alignItems: 'flex-start',
               gap: 'var(--space-3)',
+              padding: 'var(--space-3)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--separator)',
+              background: 'var(--fill-quaternary)',
+              cursor: 'pointer',
             }}
           >
-            <label
-              style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 'var(--space-3)',
-                padding: 'var(--space-3)',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--separator)',
-                background: 'var(--fill-quaternary)',
-                cursor: 'pointer',
-                minWidth: 0,
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={form.useSessionMemory}
-                onChange={(e) => setForm((f) => ({ ...f, useSessionMemory: e.target.checked }))}
-                style={{ marginTop: 2 }}
-              />
-              <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-                <span
-                  style={{
-                    fontSize: 'var(--text-caption1)',
-                    fontWeight: 'var(--weight-medium)',
-                    color: 'var(--text-primary)',
-                  }}
-                >
-                  Allow session memory
-                </span>
-                <span
-                  style={{
-                    fontSize: 'var(--text-caption2)',
-                    color: 'var(--text-tertiary)',
-                    lineHeight: 1.4,
-                  }}
-                >
-                  Let the agent rely on prior hidden session context for continuation tickets.
-                </span>
+            <input
+              type="checkbox"
+              checked={form.useSessionMemory}
+              onChange={(e) => setForm((f) => ({ ...f, useSessionMemory: e.target.checked }))}
+              style={{ marginTop: 2 }}
+            />
+            <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span
+                style={{
+                  fontSize: 'var(--text-caption1)',
+                  fontWeight: 'var(--weight-medium)',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                Allow session memory
               </span>
-            </label>
+              <span
+                style={{
+                  fontSize: 'var(--text-caption2)',
+                  color: 'var(--text-tertiary)',
+                  lineHeight: 1.4,
+                }}
+              >
+                Let the agent rely on prior hidden session context for continuation tickets.
+              </span>
+            </span>
+          </label>
+
+          {/* Assignee + Priority */}
+          <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
+            {/* Assignee */}
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+              <label
+                style={{
+                  fontSize: 'var(--text-caption1)',
+                  fontWeight: 'var(--weight-medium)',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                Assignee
+              </label>
+              <AgentPicker
+                agents={agents}
+                value={form.assigneeId}
+                onChange={(agentId) =>
+                  setForm((f) => ({
+                    ...f,
+                    assigneeId: agentId,
+                    assigneeRole: agentId ? f.assigneeRole : null,
+                  }))
+                }
+              />
+            </div>
 
             {/* Priority */}
             <div
@@ -255,6 +273,7 @@ export function CreateTicketModal({
                 alignItems: 'flex-end',
                 gap: 'var(--space-2)',
                 paddingTop: 2,
+                flexShrink: 0,
               }}
             >
               <span
@@ -266,7 +285,7 @@ export function CreateTicketModal({
               >
                 Priority
               </span>
-              <div style={{ display: 'flex', gap: 'var(--space-1)', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
                 {PRIORITIES.map((p) => {
                   const isSelected = form.priority === p
                   return (
@@ -280,8 +299,8 @@ export function CreateTicketModal({
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: 'var(--space-1)',
-                        minWidth: 74,
-                        padding: '7px 10px',
+                        minWidth: 60,
+                        padding: '7px 8px',
                         borderRadius: 'var(--radius-md)',
                         border: isSelected
                           ? `2px solid ${PRIORITY_COLORS[p]}`
@@ -310,30 +329,6 @@ export function CreateTicketModal({
                 })}
               </div>
             </div>
-          </div>
-
-          {/* Assignee */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-            <label
-              style={{
-                fontSize: 'var(--text-caption1)',
-                fontWeight: 'var(--weight-medium)',
-                color: 'var(--text-secondary)',
-              }}
-            >
-              Assignee
-            </label>
-            <AgentPicker
-              agents={agents}
-              value={form.assigneeId}
-              onChange={(agentId) =>
-                setForm((f) => ({
-                  ...f,
-                  assigneeId: agentId,
-                  assigneeRole: agentId ? f.assigneeRole : null,
-                }))
-              }
-            />
           </div>
 
           {/* Role (only shown when assignee is selected) */}

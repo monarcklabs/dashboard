@@ -128,7 +128,7 @@ export function AgentPicker({ agents, value, onChange }: AgentPickerProps) {
           alignItems: 'center',
           gap: 'var(--space-2)',
           padding: '8px 12px',
-          fontSize: 'var(--text-body)',
+          fontSize: 12,
           color: selected ? 'var(--text-primary)' : 'var(--text-tertiary)',
           cursor: 'pointer',
           textAlign: 'left',
