@@ -110,10 +110,12 @@ export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
     const controller = new AbortController()
 
     fetch(url, { signal: controller.signal })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        return res.json()
-      })
+      .then((res) =>
+        res.json().then((data) => {
+          if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`)
+          return data
+        })
+      )
       .then((data) => {
         if (isConfiguredRoot && data.resolvedId) {
           setFolderStack([{ id: data.resolvedId, name: 'Drive Folder' }])
@@ -121,9 +123,9 @@ export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
         setBrowseItems(data.items ?? [])
         setBrowseHighlightIdx(0)
       })
-      .catch((err) => {
+      .catch((err: Error) => {
         if (err.name !== 'AbortError') {
-          setBrowseError('Could not load folder contents')
+          setBrowseError(err.message || 'Could not load folder contents')
         }
       })
       .finally(() => setBrowseLoading(false))

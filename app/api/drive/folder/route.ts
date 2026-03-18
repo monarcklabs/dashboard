@@ -1,21 +1,20 @@
 import { NextResponse } from 'next/server'
 import { listFolderContents } from '@/lib/google-drive'
-import { getGoogleWorkspaceConfig } from '@/lib/integrations'
-import { loadLibraryConfig, extractDriveFolderIdFromUrl } from '@/lib/library-sync'
+import { getGoogleWorkspaceConfig, getConfiguredDriveFolderId } from '@/lib/integrations'
 
 /**
  * GET /api/drive/folder?id=FOLDER_ID
  *
  * Lists files and folders inside the given Drive folder.
- * If no id is provided, defaults to the configured library folder (from
- * library.json), falling back to 'root' if none is configured.
+ * If no id is provided, defaults to the configured drive_library folder
+ * (from integrations.json or openclaw.json).
  * Returns { items: DriveFolderItem[], resolvedId: string }.
  * Returns an empty array if Drive is not configured.
  */
 export async function GET(request: Request) {
   const config = getGoogleWorkspaceConfig()
   if (!config?.driveEnabled) {
-    return NextResponse.json({ items: [], resolvedId: 'root' })
+    return NextResponse.json({ items: [], resolvedId: null })
   }
 
   const { searchParams } = new URL(request.url)
@@ -25,10 +24,7 @@ export async function GET(request: Request) {
   if (rawId) {
     folderId = rawId
   } else {
-    // Default to configured library folder
-    const libraryConfig = loadLibraryConfig()
-    const raw = libraryConfig.folderId || libraryConfig.folderUrl
-    folderId = raw ? extractDriveFolderIdFromUrl(raw) : 'root'
+    folderId = getConfiguredDriveFolderId() ?? 'root'
   }
 
   try {

@@ -302,6 +302,22 @@ function readManifestImpersonateEmail(manifest: Record<string, unknown> | null):
     : null
 }
 
+/**
+ * Returns the configured Google Drive library folder ID, or null if not set.
+ * Checks integrations.json manifest first, then openclaw.json.
+ */
+export function getConfiguredDriveFolderId(): string | null {
+  const { workspacePath, configPath } = resolveConfigPath()
+  const config = readConfig(configPath)
+  const manifest = readIntegrationManifest(workspacePath)
+  const manifestDriveLibrary = readManifestDriveLibrary(manifest)
+  if (manifestDriveLibrary.folderId) return manifestDriveLibrary.folderId
+  if (typeof config?.drive_library_folder_id === 'string' && config.drive_library_folder_id) {
+    return config.drive_library_folder_id
+  }
+  return null
+}
+
 function readGoogleWorkspaceCredentialConfig(workspacePath: string | null): {
   saJson: string | null
   impersonateEmail: string | null
