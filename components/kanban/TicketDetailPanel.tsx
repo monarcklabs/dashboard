@@ -344,7 +344,7 @@ export function TicketDetailPanel({
         className="h-full flex flex-col ml-auto"
         style={{
           width: '100%',
-          maxWidth: expanded ? 680 : 420,
+          maxWidth: expanded ? 800 : 420,
           flexShrink: 0,
           transition: 'max-width 200ms var(--ease-smooth)',
           background: 'var(--material-regular)',
@@ -443,49 +443,38 @@ export function TicketDetailPanel({
               marginTop: 'var(--space-2)',
               flexWrap: 'wrap',
             }}>
-              <label style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-                <select
-                  value={ticket.status}
-                  onChange={(e) => onStatusChange(e.target.value as TicketStatus)}
-                  className="focus-ring"
-                  aria-label="Ticket status"
-                  style={{
-                    appearance: 'none',
-                    WebkitAppearance: 'none',
-                    MozAppearance: 'none',
-                    fontSize: 'var(--text-caption2)',
-                    fontWeight: 700,
-                    color: accentColor,
-                    background: 'var(--accent-fill)',
-                    border: `1px solid color-mix(in srgb, ${accentColor} 35%, transparent)`,
-                    padding: '5px 28px 5px var(--space-2)',
-                    borderRadius: 'var(--radius-sm)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.3px',
-                    cursor: 'pointer',
-                    outline: 'none',
-                  }}
-                >
-                  {COLUMNS.map((col) => (
-                    <option key={col.id} value={col.id}>
-                      {col.title}
-                    </option>
-                  ))}
-                </select>
-                <span
-                  aria-hidden="true"
-                  style={{
-                    position: 'absolute',
-                    right: 10,
-                    pointerEvents: 'none',
-                    color: accentColor,
-                    fontSize: 10,
-                    lineHeight: 1,
-                  }}
-                >
-                  ▼
-                </span>
-              </label>
+              <span style={{
+                fontSize: 'var(--text-caption2)',
+                fontWeight: 600,
+                color: 'var(--text-tertiary)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.3px',
+              }}>
+                Move to
+              </span>
+              <div style={{ display: 'flex', gap: 'var(--space-1)', flexWrap: 'wrap' }}>
+                {COLUMNS.filter(col => col.id !== ticket.status).map((col) => (
+                  <button
+                    key={col.id}
+                    type="button"
+                    onClick={() => onStatusChange(col.id as TicketStatus)}
+                    className="focus-ring"
+                    style={{
+                      fontSize: 'var(--text-caption2)',
+                      fontWeight: 600,
+                      padding: '5px 10px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--separator)',
+                      background: 'var(--fill-tertiary)',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      transition: 'all 120ms ease',
+                    }}
+                  >
+                    {col.title}
+                  </button>
+                ))}
+              </div>
               <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                 {(['low', 'medium', 'high'] as TicketPriority[]).map((priority) => {
                   const isSelected = ticket.priority === priority
@@ -536,75 +525,32 @@ export function TicketDetailPanel({
                 Assignment
               </div>
               {assigneeEditable ? (
-                <>
-                  <AgentPicker
-                    agents={agents}
-                    value={ticket.assigneeId || ''}
-                    onChange={updateAssignee}
-                  />
-                  {ticket.assigneeId && (
-                    <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-                      {roleOptions.map((role) => {
-                        const isSelected = ticket.assigneeRole === role
-                        return (
-                          <button
-                            key={role}
-                            type="button"
-                            className="focus-ring"
-                            onClick={() => onUpdateTicket({ assigneeRole: isSelected ? null : role })}
-                            style={{
-                              padding: '6px 10px',
-                              borderRadius: 'var(--radius-sm)',
-                              border: isSelected ? '1px solid var(--accent)' : '1px solid var(--separator)',
-                              background: isSelected ? 'var(--accent-fill)' : 'transparent',
-                              color: isSelected ? 'var(--text-primary)' : 'var(--text-tertiary)',
-                              cursor: 'pointer',
-                              fontSize: 'var(--text-caption2)',
-                              fontWeight: 600,
-                            }}
-                          >
-                            {ROLE_LABELS[role]}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )}
-                </>
+                <AgentPicker
+                  agents={agents}
+                  value={ticket.assigneeId || ''}
+                  onChange={updateAssignee}
+                />
               ) : (
-                <>
-                  {agent ? (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 'var(--space-2)',
-                      fontSize: 'var(--text-footnote)',
-                      color: 'var(--text-secondary)',
-                    }}>
-                      <AgentAvatar agent={agent} size={24} borderRadius={7} />
-                      <span>{agent.name}</span>
-                      {ticket.assigneeRole && (
-                        <span style={{ color: 'var(--text-tertiary)' }}>
-                          ({ROLE_LABELS[ticket.assigneeRole]})
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <div style={{
-                      fontSize: 'var(--text-footnote)',
-                      color: 'var(--text-tertiary)',
-                      fontStyle: 'italic',
-                    }}>
-                      Unassigned
-                    </div>
-                  )}
+                agent ? (
                   <div style={{
-                    fontSize: 'var(--text-caption2)',
-                    color: 'var(--text-tertiary)',
-                    lineHeight: 1.4,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-2)',
+                    fontSize: 'var(--text-footnote)',
+                    color: 'var(--text-secondary)',
                   }}>
-                    Assignee and role can only be changed while the ticket is in Backlog or To Do.
+                    <AgentAvatar agent={agent} size={24} borderRadius={7} />
+                    <span>{agent.name}</span>
                   </div>
-                </>
+                ) : (
+                  <div style={{
+                    fontSize: 'var(--text-footnote)',
+                    color: 'var(--text-tertiary)',
+                    fontStyle: 'italic',
+                  }}>
+                    Unassigned
+                  </div>
+                )
               )}
             </div>
           </div>
@@ -722,7 +668,7 @@ export function TicketDetailPanel({
                   color: 'var(--text-tertiary)',
                   lineHeight: 1.4,
                 }}>
-                  When enabled, the agent may rely on prior hidden session context and treat this as a continuation.
+                  Let the agent rely on prior session context for continuation tickets.
                 </span>
               </span>
             </label>
@@ -764,6 +710,28 @@ export function TicketDetailPanel({
               }}>
                 {formatMessage(ticket.workResult)}
               </div>
+              {ticket.workResult.trim().length > 200 && (
+                <button
+                  type="button"
+                  onClick={() => openMarkdownDocument(ticket.workResult!)}
+                  className="focus-ring"
+                  style={{
+                    marginTop: 'var(--space-2)',
+                    fontSize: 'var(--text-caption2)',
+                    fontWeight: 600,
+                    padding: '6px 10px',
+                    borderRadius: 'var(--radius-md)',
+                    border: 'none',
+                    background: accentColor,
+                    color: '#fff',
+                    cursor: 'pointer',
+                    boxShadow: `0 6px 16px color-mix(in srgb, ${accentColor} 25%, transparent)`,
+                    transition: 'all 120ms ease',
+                  }}
+                >
+                  Open .md
+                </button>
+              )}
             </div>
           )}
 
