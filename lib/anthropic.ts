@@ -79,6 +79,18 @@ export function buildTextPrompt(systemPrompt: string, messages: ApiMessage[]): s
 }
 
 /**
+ * Extract the JSON portion from CLI output that may contain non-JSON prefix
+ * lines (e.g. plugin loading messages like "[plugins] ...").
+ */
+function extractJson(raw: string): string {
+  // Find the first line that starts with '{' or '['
+  const lines = raw.split('\n')
+  const jsonStart = lines.findIndex((l) => /^\s*[{[]/.test(l))
+  if (jsonStart === -1) return raw
+  return lines.slice(jsonStart).join('\n')
+}
+
+/**
  * Run openclaw CLI and return stdout, or null on error.
  */
 export function execCli(
@@ -94,7 +106,7 @@ export function execCli(
         resolve(null)
         return
       }
-      resolve(stdout)
+      resolve(extractJson(stdout))
     })
   })
 }
