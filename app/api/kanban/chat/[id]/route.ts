@@ -7,11 +7,25 @@ import { buildKanbanSystemPrompt, sanitizeKanbanTicketContext, type AgentEnviron
 import { getIntegrationsSummary, getGoogleWorkspaceConfig } from '@/lib/integrations'
 import { getActiveComposioApps } from '@/lib/composio'
 import { humanizeKanbanChatError } from '@/lib/kanban/chat-errors'
+import { downloadDriveFile } from '@/lib/google-drive'
 
 const openai = new OpenAI({
   baseURL: gatewayBaseUrl(),
   apiKey: process.env.OPENCLAW_GATEWAY_TOKEN,
 })
+
+const TEXT_MIME_PREFIXES = ['text/', 'application/json', 'application/xml', 'application/javascript']
+
+function extractTextFromDataUrl(dataUrl: string): string | null {
+  const match = dataUrl.match(/^data:([^;,]+)(;base64)?,([^]*)$/)
+  if (!match) return null
+  const [, mimeType, isBase64, data] = match
+  const isText = TEXT_MIME_PREFIXES.some((p) => mimeType.startsWith(p))
+  if (!isText) return null
+  return isBase64
+    ? Buffer.from(data, 'base64').toString('utf-8')
+    : decodeURIComponent(data)
+}
 
 function isValidMessage(m: unknown): m is { role: 'user' | 'assistant'; content: string } {
   if (!m || typeof m !== 'object') return false
@@ -58,12 +72,33 @@ export async function POST(
 
   const ticket = sanitizeKanbanTicketContext(body.ticket)
 
+  const gwsConfig = getGoogleWorkspaceConfig()
+
+  // Fetch file content server-side so the agent can read the actual documents
+  if (ticket && ticket.relevantFiles.length > 0) {
+    await Promise.all(
+      ticket.relevantFiles.map(async (file) => {
+        try {
+          if (file.url.startsWith('data:')) {
+            // Uploaded file — decode base64 data URL to text
+            file.content = extractTextFromDataUrl(file.url) ?? undefined
+          } else if (file.id && gwsConfig) {
+            // Google Drive file — download via service account
+            const text = await downloadDriveFile(file.id, file.mimeType, gwsConfig)
+            if (text) file.content = text
+          }
+        } catch {
+          // Non-fatal — agent gets name/URL only for this file
+        }
+      })
+    )
+  }
+
   let environment: AgentEnvironmentContext | null = null
   try {
-    const [summary, composioApps, gwsConfig] = await Promise.all([
+    const [summary, composioApps] = await Promise.all([
       Promise.resolve(getIntegrationsSummary()),
       getActiveComposioApps(),
-      Promise.resolve(getGoogleWorkspaceConfig()),
     ])
     // Merge Composio apps with GWS service account integrations
     const allServices = [...composioApps]

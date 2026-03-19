@@ -7,6 +7,7 @@ const MAX_RESULT = 10000
 interface RawRelevantFile {
   id?: unknown
   name?: unknown
+  mimeType?: unknown
   url?: unknown
 }
 
@@ -22,8 +23,12 @@ interface RawTicketLike {
 }
 
 export interface SanitizedRelevantFile {
+  id: string
   name: string
+  mimeType: string
   url: string
+  /** Fetched file content, populated server-side before prompt building */
+  content?: string
 }
 
 export interface SanitizedKanbanTicketContext {
@@ -46,7 +51,9 @@ export function sanitizeKanbanTicketContext(rawTicket: unknown): SanitizedKanban
         .filter((f): f is RawRelevantFile & { name: string } => typeof f?.name === 'string')
         .slice(0, 20)
         .map((f) => ({
+          id: typeof f.id === 'string' ? f.id : '',
           name: String(f.name),
+          mimeType: typeof f.mimeType === 'string' ? f.mimeType : '',
           url: typeof f.url === 'string' ? f.url : '',
         }))
     : []
@@ -140,11 +147,59 @@ If the provided messages do not include a prior assistant reply, do not say "as 
     : `${ticketContext}${envBlock}`
 }
 
+// ~5 k tokens shared across all attached files
+const TOTAL_FILE_CHAR_BUDGET = 20000
+const MAX_CSV_ROWS = 150
+
+/** Normalizes whitespace and applies type-aware trimming before budgeting. */
+function compactContent(text: string, mimeType: string): string {
+  // Normalize line endings, trim trailing spaces per line, collapse excess blank lines
+  let out = text
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map((l) => l.trimEnd())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+
+  // For CSV exports (Google Sheets), limit rows — each row can be very wide
+  if (mimeType === 'text/csv') {
+    const rows = out.split('\n')
+    if (rows.length > MAX_CSV_ROWS) {
+      out =
+        rows.slice(0, MAX_CSV_ROWS).join('\n') +
+        `\n[...${rows.length - MAX_CSV_ROWS} more rows omitted]`
+    }
+  }
+
+  return out
+}
+
 function buildRelevantFilesBlock(files: SanitizedRelevantFile[]): string {
   if (files.length === 0) return ''
 
-  const lines = files.map((f) => f.url ? `- "${f.name}" (${f.url})` : `- "${f.name}"`)
-  return `\n\nRelevant files attached to this ticket:\n${lines.join('\n')}\nReference these files when relevant to the work.`
+  // Compact all content first, then distribute the shared character budget proportionally
+  const compacted = files.map((f) =>
+    f.content ? compactContent(f.content, f.mimeType) : null
+  )
+  const filesWithContent = compacted.filter(Boolean).length
+  const perFileBudget = filesWithContent > 0
+    ? Math.floor(TOTAL_FILE_CHAR_BUDGET / filesWithContent)
+    : TOTAL_FILE_CHAR_BUDGET
+
+  const lines = files.map((f, i) => {
+    const isDataUrl = f.url.startsWith('data:')
+    const header = f.url && !isDataUrl ? `- "${f.name}" (${f.url})` : `- "${f.name}"`
+    const content = compacted[i]
+    if (!content) return header
+    const body = content.length > perFileBudget
+      ? content.slice(0, perFileBudget) + '\n[...truncated]'
+      : content
+    return `${header}\n\`\`\`\n${body}\n\`\`\``
+  })
+
+  return `\n\nRelevant files:\n${lines.join('\n')}\nReference these when relevant.`
 }
 
 function buildWorkContext(status: string, workResult: string | null): string {
