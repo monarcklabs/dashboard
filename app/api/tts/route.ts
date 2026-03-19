@@ -3,12 +3,11 @@ export const runtime = 'nodejs'
 import OpenAI from 'openai'
 import { gatewayBaseUrl } from '@/lib/env'
 
-const openai = new OpenAI({
-  baseURL: gatewayBaseUrl(),
-  apiKey: process.env.OPENCLAW_GATEWAY_TOKEN,
-})
-
 export async function POST(request: Request) {
+  const openai = new OpenAI({
+    baseURL: gatewayBaseUrl(),
+    apiKey: process.env.OPENCLAW_GATEWAY_TOKEN,
+  })
   try {
     const { text, voice } = await request.json()
 

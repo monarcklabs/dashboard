@@ -9,12 +9,11 @@ import { buildCronSuggestionsPrompt } from '@/lib/pipeline-utils'
 import { gatewayBaseUrl } from '@/lib/env'
 import OpenAI from 'openai'
 
-const openai = new OpenAI({
-  baseURL: gatewayBaseUrl(),
-  apiKey: process.env.OPENCLAW_GATEWAY_TOKEN,
-})
-
 export async function GET() {
+  const openai = new OpenAI({
+    baseURL: gatewayBaseUrl(),
+    apiKey: process.env.OPENCLAW_GATEWAY_TOKEN,
+  })
   try {
     const [crons, agents, composioApps, integrationsSummary, gwsConfig] = await Promise.all([
       getCrons(),
