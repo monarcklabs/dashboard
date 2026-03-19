@@ -95,11 +95,12 @@ export default function KanbanPage() {
         .then((remote: KanbanStore | null) => {
           if (!remote) return
           setTickets((prev) => {
+            const merged = mergeTicketStores(remote, prev)
             const prevJson = JSON.stringify(prev)
-            const remoteJson = JSON.stringify(remote)
-            if (prevJson === remoteJson) return prev
-            saveTickets(remote)
-            return remote
+            const mergedJson = JSON.stringify(merged)
+            if (mergedJson === prevJson) return prev
+            saveTickets(merged)
+            return merged
           })
         })
         .catch(() => {})
