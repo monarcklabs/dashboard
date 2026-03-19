@@ -32,6 +32,19 @@ export default function KanbanPage() {
   const [filterAgentId, setFilterAgentId] = useState<string | null>(null)
   const [hydrated, setHydrated] = useState(false)
 
+  // Wrapper that persists to localStorage synchronously during the state update,
+  // so the data survives even if the user refreshes before effects run.
+  const persistTickets = useCallback(
+    (updater: KanbanStore | ((prev: KanbanStore) => KanbanStore)) => {
+      setTickets((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater
+        saveTickets(next)
+        return next
+      })
+    },
+    [],
+  )
+
   const loadData = useCallback(() => {
     setLoading(true)
     setTicketError(null)
@@ -46,8 +59,7 @@ export default function KanbanPage() {
       .catch(() => ({} as KanbanStore))
       .then(async (remoteTickets) => {
         const merged = mergeTicketStores(remoteTickets, localTickets)
-        setTickets(merged)
-        saveTickets(merged)
+        persistTickets(merged)
         setHydrated(true)
 
         const localJson = JSON.stringify(localTickets)
@@ -68,16 +80,15 @@ export default function KanbanPage() {
       })
       .catch((e) => setTicketError(e instanceof Error ? e.message : 'Failed to load kanban tickets'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [persistTickets])
 
   useEffect(() => {
     loadData()
   }, [loadData])
 
-  // Persist tickets whenever they change
+  // Sync to server whenever tickets change (localStorage is already saved synchronously via persistTickets)
   useEffect(() => {
     if (!loading && hydrated) {
-      saveTickets(tickets)
       fetch('/api/kanban/tickets', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -94,12 +105,9 @@ export default function KanbanPage() {
         .then((r) => (r.ok ? r.json() : null))
         .then((remote: KanbanStore | null) => {
           if (!remote) return
-          setTickets((prev) => {
+          persistTickets((prev) => {
             const merged = mergeTicketStores(remote, prev)
-            const prevJson = JSON.stringify(prev)
-            const mergedJson = JSON.stringify(merged)
-            if (mergedJson === prevJson) return prev
-            saveTickets(merged)
+            if (JSON.stringify(merged) === JSON.stringify(prev)) return prev
             return merged
           })
         })
@@ -107,7 +115,7 @@ export default function KanbanPage() {
     }, 10000)
 
     return () => window.clearInterval(interval)
-  }, [hydrated])
+  }, [hydrated, persistTickets])
 
   // Keep selectedTicket in sync with store
   useEffect(() => {
@@ -128,7 +136,7 @@ export default function KanbanPage() {
     assigneeId: string | null
     assigneeRole: TeamRole | null
   }) {
-    setTickets((prev) =>
+    persistTickets((prev) =>
       createTicket(prev, {
         ...data,
         status: 'backlog',
@@ -142,19 +150,19 @@ export default function KanbanPage() {
     if (ticket && (ticket.workState === 'working' || ticket.workState === 'starting')) {
       return
     }
-    setTickets((prev) => moveTicket(prev, ticketId, status))
+    persistTickets((prev) => moveTicket(prev, ticketId, status))
   }
 
   function handleDeleteTicket(ticketId: string) {
-    setTickets((prev) => deleteTicket(prev, ticketId))
+    persistTickets((prev) => deleteTicket(prev, ticketId))
     setSelectedTicket(null)
   }
 
   const handleUpdateTicket = useCallback(
     (ticketId: string, updates: Partial<KanbanTicket>) => {
-      setTickets((prev) => updateTicket(prev, ticketId, updates))
+      persistTickets((prev) => updateTicket(prev, ticketId, updates))
     },
-    [],
+    [persistTickets],
   )
 
   const { isWorking } = useAgentWork({
@@ -163,7 +171,7 @@ export default function KanbanPage() {
   })
 
   function handleRetryWork(ticketId: string) {
-    setTickets((prev) =>
+    persistTickets((prev) =>
       updateTicket(prev, ticketId, {
         status: 'todo',
         workState: 'idle',
