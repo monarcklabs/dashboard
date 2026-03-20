@@ -2,50 +2,28 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { ThemeProvider } from './providers';
 import { SettingsProvider } from './settings-provider';
-import { AgentsProvider } from './agents-provider';
-import { Sidebar } from '@/components/Sidebar';
-import { DynamicFavicon } from '@/components/DynamicFavicon';
-import { OnboardingWizard } from '@/components/OnboardingWizard';
-import { LiveStreamWidget } from '@/components/LiveStreamWidget';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { AppShell } from '@/components/auth/AppShell';
 import { APP_NAME } from '@/lib/branding';
+import { getCurrentSession } from '@/lib/auth';
 
 export const metadata: Metadata = {
   title: `${APP_NAME} -- Command Centre`,
   description: `${APP_NAME} AI Agent Management Dashboard`,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await getCurrentSession()
+
   return (
     <html lang="en" data-theme="dark" suppressHydrationWarning>
       <body>
         <ThemeProvider>
           <SettingsProvider>
-            <AgentsProvider>
-            <DynamicFavicon />
-            <OnboardingWizard />
-            <LiveStreamWidget />
-            <div
-              className="flex h-screen overflow-hidden"
-              style={{ background: 'var(--bg)' }}
-            >
-              {/* Client-side shell handles both desktop sidebar + mobile */}
-              <Sidebar />
-
-              {/* Main content */}
-              <main className="flex-1 overflow-hidden relative">
-                {/* Mobile spacer for fixed header */}
-                <div className="md:hidden" style={{ height: '48px', flexShrink: 0 }} />
-                <ErrorBoundary>
-                  {children}
-                </ErrorBoundary>
-              </main>
-            </div>
-          </AgentsProvider>
+            <AppShell session={session}>{children}</AppShell>
           </SettingsProvider>
         </ThemeProvider>
       </body>

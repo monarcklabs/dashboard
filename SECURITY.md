@@ -18,7 +18,7 @@ Please include steps to reproduce, affected versions, and potential impact. You 
 
 ## Security Model
 
-ClawPort is a **local-first, single-operator tool**. It is designed to run on a developer's own machine or a trusted server. There is no user authentication system, no multi-tenant isolation, and no public-facing deployment expected.
+ClawPort is a **local-first dashboard**. It is designed to run on a developer's own machine or a trusted server. Customer-facing deployments should use an external identity provider such as authentik for login, with the app enforcing authenticated sessions for every page and API request. ClawPort is still not a multi-tenant platform.
 
 The trust boundary is the local machine. If an attacker has access to the machine running ClawPort, the application is not the appropriate layer of defense.
 
@@ -56,7 +56,7 @@ The following are not considered vulnerabilities in ClawPort:
 - Social engineering attacks.
 - Physical access to the host machine.
 - Vulnerabilities in OpenClaw, the gateway, or upstream AI providers (report those to their respective maintainers).
-- Missing authentication or authorization (by design -- this is a single-operator tool).
+- Multi-tenant isolation requirements. Built-in auth is intended to protect access to a trusted deployment, not to provide tenant-level data isolation.
 - Data readable in `localStorage` by same-origin scripts (expected browser behavior).
 
 ## Dependencies

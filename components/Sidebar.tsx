@@ -7,12 +7,13 @@ import { MobileSidebar } from '@/components/MobileSidebar';
 import { MonarckMark } from '@/components/MonarckMark';
 import { SidebarUsageWidget } from '@/components/sidebar/SidebarUsageWidget';
 import { GlobalSearch, SearchTrigger } from '@/components/GlobalSearch';
+import type { DashboardSession } from '@/lib/auth';
 
 /**
  * Sidebar -- client wrapper that coordinates desktop sidebar, mobile sidebar,
  * and the Cmd+K search palette. Rendered inside layout.tsx.
  */
-export function Sidebar() {
+export function Sidebar({ session }: { session: DashboardSession | null }) {
   const openSearch = useCallback(() => {
     // We trigger the search modal by simulating Cmd+K.
     // Instead, we expose a controlled open state via a custom event.
@@ -50,12 +51,12 @@ export function Sidebar() {
           <SearchTrigger onClick={openSearch} />
         </div>
 
-        <NavLinks bottomSlot={<SidebarUsageWidget />} />
+        <NavLinks bottomSlot={<SidebarUsageWidget />} session={session} />
         <ThemeToggle />
       </aside>
 
       {/* Mobile sidebar */}
-      <MobileSidebar onOpenSearch={openSearch} />
+      <MobileSidebar onOpenSearch={openSearch} session={session} />
 
       {/* Global search modal (Cmd+K) */}
       <GlobalSearch />

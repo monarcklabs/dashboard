@@ -83,6 +83,18 @@ clawport dev
 
 Open [http://localhost:3000](http://localhost:3000). The onboarding wizard walks you through naming your portal, picking a theme, and setting up your operator identity.
 
+For customer-facing deployments, wire the dashboard to a per-deployment authentik app in `.env.local`:
+
+```bash
+AUTHENTIK_ISSUER=https://auth.client1.monarck.ai/application/o/clawport
+AUTHENTIK_CLIENT_ID=...
+AUTHENTIK_CLIENT_SECRET=...
+NEXTAUTH_SECRET=...
+NEXTAUTH_URL=https://client1.monarck.ai
+```
+
+You can also enable Cloudflare Turnstile on the login form with `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, and `TURNSTILE_ALLOWED_HOSTNAMES`.
+
 <details>
 <summary><strong>Install from source instead</strong></summary>
 
@@ -148,6 +160,13 @@ All AI calls -- chat, vision, TTS, transcription -- route through the gateway. O
 
 | Variable | Description |
 |----------|-------------|
+| `AUTHENTIK_ISSUER` | Issuer URL for this deployment's authentik application |
+| `AUTHENTIK_CLIENT_ID` | Authentik OAuth client ID |
+| `AUTHENTIK_CLIENT_SECRET` | Authentik OAuth client secret |
+| `NEXTAUTH_SECRET` | Session/JWT signing secret for Auth.js |
+| `NEXTAUTH_URL` | Public base URL for this dashboard deployment |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | Enables Cloudflare Turnstile on login with server-side Siteverify validation |
+| `TURNSTILE_ALLOWED_HOSTNAMES` | Comma-separated hostnames permitted to require Turnstile, for example `monarck.ai,app.monarck.ai` |
 | `ELEVENLABS_API_KEY` | ElevenLabs API key for voice indicators on agent profiles |
 
 Running `clawport setup` auto-detects all required values and writes `.env.local`. When installed globally, if the package directory isn't writable, setup writes to `~/.config/clawport-ui/.env.local` instead. See [SETUP.md](SETUP.md) for manual configuration, agent customization, and troubleshooting.
@@ -215,6 +234,7 @@ npx next build       # Production build
 | [docs/API.md](docs/API.md) | REST API reference for all endpoints |
 | [docs/COMPONENTS.md](docs/COMPONENTS.md) | UI component catalog (50+ components) |
 | [docs/THEMING.md](docs/THEMING.md) | Theme system, CSS tokens, settings API |
+| [docs/CLOUDFLARE_SECURITY.md](docs/CLOUDFLARE_SECURITY.md) | Edge security checklist for customer-facing deployments |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
 | [docs/OPENCLAW.md](docs/OPENCLAW.md) | OpenClaw integration reference |

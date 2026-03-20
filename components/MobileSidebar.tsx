@@ -8,11 +8,14 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { SearchTrigger } from '@/components/GlobalSearch';
 import { MonarckMark } from '@/components/MonarckMark';
 import { SidebarUsageWidget } from '@/components/sidebar/SidebarUsageWidget';
+import type { DashboardSession } from '@/lib/auth';
 
 export function MobileSidebar({
   onOpenSearch,
+  session,
 }: {
   onOpenSearch?: () => void;
+  session: DashboardSession | null;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -156,7 +159,7 @@ export function MobileSidebar({
           <SearchTrigger onClick={handleSearchClick} />
         </div>
 
-        <NavLinks bottomSlot={<SidebarUsageWidget />} />
+        <NavLinks bottomSlot={<SidebarUsageWidget />} session={session} />
         <ThemeToggle />
       </aside>
     </>

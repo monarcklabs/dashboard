@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Map, MessageSquare, Clock, Activity, Brain, Columns3, BookOpen, Settings, DollarSign, PlugZap, BriefcaseBusiness } from 'lucide-react';
+import { Map, MessageSquare, Clock, Activity, Brain, Columns3, BookOpen, Settings, DollarSign, PlugZap, BriefcaseBusiness, LogOut } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { signOut } from 'next-auth/react';
 import type { CronJob } from '@/lib/types';
 import { useSettings } from '@/app/settings-provider';
 import {
@@ -14,6 +15,7 @@ import {
   shouldShowClientHub,
 } from '@/lib/branding';
 import { useAgentsContext } from '@/app/agents-provider';
+import type { DashboardSession } from '@/lib/auth';
 
 function getInitials(name: string | null): string {
   if (!name) return '??'
@@ -52,7 +54,13 @@ const NAV_ITEMS: NavItem[] = [
 // NavLinks component
 // ---------------------------------------------------------------------------
 
-export function NavLinks({ bottomSlot }: { bottomSlot?: React.ReactNode } = {}) {
+export function NavLinks({
+  bottomSlot,
+  session,
+}: {
+  bottomSlot?: React.ReactNode
+  session: DashboardSession | null
+}) {
   const pathname = usePathname();
   const { settings } = useSettings();
   const [isClientFacingHost, setIsClientFacingHost] = useState<boolean | null>(null);
@@ -60,6 +68,7 @@ export function NavLinks({ bottomSlot }: { bottomSlot?: React.ReactNode } = {}) 
   const agentCount = agents.length > 0 ? agents.length : null;
   const [cronCount, setCronCount] = useState<number | null>(null);
   const [cronErrorCount, setCronErrorCount] = useState<number | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     setIsClientFacingHost(isMonarckProductionHost(window.location.hostname));
@@ -89,6 +98,17 @@ export function NavLinks({ bottomSlot }: { bottomSlot?: React.ReactNode } = {}) 
         setCronErrorCount(null);
       });
   }, [isClientFacingHost]);
+
+  async function handleLogout() {
+    if (loggingOut) return;
+    setLoggingOut(true);
+
+    try {
+      await signOut({ callbackUrl: '/login' });
+    } finally {
+      setLoggingOut(false);
+    }
+  }
 
   // Resolve badge content per nav item
   function getBadge(item: NavItem): React.ReactNode {
@@ -155,6 +175,9 @@ export function NavLinks({ bottomSlot }: { bottomSlot?: React.ReactNode } = {}) 
     }
     return null;
   }
+
+  const footerName = session?.user?.name ?? settings.operatorName ?? 'Operator';
+  const footerRole = session?.user?.role ?? 'member';
 
   return (
     <nav className="flex-1 flex flex-col" style={{ minHeight: 0, overflow: 'hidden' }} aria-label="Main navigation">
@@ -258,9 +281,9 @@ export function NavLinks({ bottomSlot }: { bottomSlot?: React.ReactNode } = {}) 
                 letterSpacing: '-0.02em',
               }}
             >
-              {getInitials(settings.operatorName)}
+              {getInitials(footerName)}
             </div>
-            <div style={{ minWidth: 0 }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
               <div
                 style={{
                   fontSize: '13px',
@@ -271,7 +294,7 @@ export function NavLinks({ bottomSlot }: { bottomSlot?: React.ReactNode } = {}) 
                   whiteSpace: 'nowrap',
                 }}
               >
-                {settings.operatorName ?? 'Operator'}
+                {footerName}
               </div>
               <div
                 style={{
@@ -279,9 +302,33 @@ export function NavLinks({ bottomSlot }: { bottomSlot?: React.ReactNode } = {}) 
                   color: 'var(--text-tertiary)',
                 }}
               >
-                Owner
+                {footerRole.slice(0, 1).toUpperCase() + footerRole.slice(1)}
               </div>
             </div>
+            {session && (
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={loggingOut}
+                className="focus-ring"
+                aria-label="Sign out"
+                style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--separator)',
+                  background: 'transparent',
+                  color: 'var(--text-secondary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: loggingOut ? 'default' : 'pointer',
+                  opacity: loggingOut ? 0.6 : 1,
+                }}
+              >
+                <LogOut size={14} />
+              </button>
+            )}
           </div>
         </div>
       </div>
