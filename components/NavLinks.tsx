@@ -54,13 +54,15 @@ const NAV_ITEMS: NavItem[] = [
 // NavLinks component
 // ---------------------------------------------------------------------------
 
+interface NavLinksProps {
+  bottomSlot?: React.ReactNode;
+  session?: DashboardSession | null;
+}
+
 export function NavLinks({
   bottomSlot,
-  session,
-}: {
-  bottomSlot?: React.ReactNode
-  session: DashboardSession | null
-}) {
+  session = null,
+}: NavLinksProps) {
   const pathname = usePathname();
   const { settings } = useSettings();
   const [isClientFacingHost, setIsClientFacingHost] = useState<boolean | null>(null);
