@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
+import { signIn } from 'next-auth/react'
 import { TurnstileWidget } from '@/components/auth/TurnstileWidget'
 
 export function LoginForm({
@@ -46,12 +47,9 @@ export function LoginForm({
         return
       }
 
-      const redirectTo =
-        typeof data?.redirectTo === 'string' && data.redirectTo.startsWith('/')
-          ? data.redirectTo
-          : '/api/auth/signin/authentik'
-
-      window.location.assign(redirectTo)
+      await signIn('authentik', {
+        callbackUrl: nextPath,
+      })
     } catch {
       setError('Could not reach the login endpoint.')
       if (turnstileEnabled) {
