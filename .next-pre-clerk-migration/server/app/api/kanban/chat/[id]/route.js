@@ -1,0 +1,10 @@
+var R=require("../../../../../chunks/[turbopack]_runtime.js")("server/app/api/kanban/chat/[id]/route.js")
+R.c("server/chunks/[root-of-the-server]__0ff55bbc._.js")
+R.c("server/chunks/node_modules_openai_index_mjs_88cf4560._.js")
+R.c("server/chunks/lib_fa383252._.js")
+R.c("server/chunks/[root-of-the-server]__8f5ebbc3._.js")
+R.c("server/chunks/[root-of-the-server]__3b18c028._.js")
+R.c("server/chunks/node_modules_next_dist_esm_build_templates_app-route_07585723.js")
+R.c("server/chunks/_next-internal_server_app_api_kanban_chat_[id]_route_actions_00be74e2.js")
+R.m(72085)
+module.exports=R.m(72085).exports

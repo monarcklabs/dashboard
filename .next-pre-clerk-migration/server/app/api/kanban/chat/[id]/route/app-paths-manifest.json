@@ -1,0 +1,3 @@
+{
+  "/api/kanban/chat/[id]/route": "app/api/kanban/chat/[id]/route.js"
+}

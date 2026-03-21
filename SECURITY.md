@@ -18,7 +18,7 @@ Please include steps to reproduce, affected versions, and potential impact. You 
 
 ## Security Model
 
-ClawPort is a **local-first dashboard**. It is designed to run on a developer's own machine or a trusted server. Customer-facing deployments should use an external identity provider such as authentik for login, with the app enforcing authenticated sessions for every page and API request. ClawPort is still not a multi-tenant platform.
+ClawPort is a **local-first dashboard**. It is designed to run on a developer's own machine or a trusted server. Customer-facing deployments should use an external identity provider such as Clerk for login, with the app enforcing authenticated sessions for every page and API request. ClawPort is still not a multi-tenant platform.
 
 The trust boundary is the local machine. If an attacker has access to the machine running ClawPort, the application is not the appropriate layer of defense.
 

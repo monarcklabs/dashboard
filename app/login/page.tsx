@@ -1,10 +1,11 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
-import { Loader2, ShieldCheck } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
+import { Show } from '@clerk/nextjs'
 import { LoginForm } from '@/components/auth/LoginForm'
 import { MonarckMark } from '@/components/MonarckMark'
 import { APP_NAME } from '@/lib/branding'
-import { authIsConfigured, getCurrentSession, getRequestHost } from '@/lib/auth'
+import { getCurrentSession, getRequestHost } from '@/lib/auth'
 import {
   getTurnstileWidgetConfigForHostname,
   sanitizeReturnTo,
@@ -15,37 +16,6 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ next?: string; error?: string }>
 }) {
-  if (!authIsConfigured()) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center px-6"
-        style={{ background: 'var(--bg)' }}
-      >
-        <div
-          style={{
-            width: '100%',
-            maxWidth: '520px',
-            borderRadius: '24px',
-            border: '1px solid rgba(255,69,58,0.25)',
-            background: 'linear-gradient(180deg, rgba(255,69,58,0.12), rgba(255,69,58,0.04))',
-            boxShadow: 'var(--shadow-overlay)',
-            padding: '28px',
-            color: 'var(--text-primary)',
-          }}
-        >
-          <div className="flex items-center gap-3" style={{ marginBottom: '14px' }}>
-            <ShieldCheck size={20} style={{ color: 'var(--system-red)' }} />
-            <strong>Auth configuration error</strong>
-          </div>
-          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            Authentik is not configured. Set AUTHENTIK_ISSUER, AUTHENTIK_CLIENT_ID,
-            AUTHENTIK_CLIENT_SECRET, and NEXTAUTH_SECRET.
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   const params = await searchParams
   const requestHeaders = await headers()
   const turnstileConfig = getTurnstileWidgetConfigForHostname(
@@ -124,15 +94,17 @@ export default async function LoginPage({
             {authError
               ? authError
               : turnstileConfig?.siteKey
-              ? 'Complete the security check and you will be redirected to sign in.'
-              : 'Redirecting to sign in.'}
+              ? 'Complete the security check to unlock Clerk sign-in.'
+              : 'Continue with Clerk to sign in or create your first account.'}
           </p>
 
-          <LoginForm
-            nextPath={nextPath}
-            turnstileSiteKey={turnstileConfig?.siteKey ?? null}
-            initialError={authError}
-          />
+          <Show when="signed-out">
+            <LoginForm
+              nextPath={nextPath}
+              turnstileSiteKey={turnstileConfig?.siteKey ?? null}
+              initialError={authError}
+            />
+          </Show>
 
           <div
             style={{
@@ -146,7 +118,7 @@ export default async function LoginPage({
             }}
           >
             <Loader2 size={12} className="animate-spin" />
-            <span>Powered by authentik</span>
+            <span>Powered by Clerk</span>
           </div>
         </section>
       </div>

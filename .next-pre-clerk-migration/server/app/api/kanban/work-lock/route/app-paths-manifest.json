@@ -1,0 +1,3 @@
+{
+  "/api/kanban/work-lock/route": "app/api/kanban/work-lock/route.js"
+}

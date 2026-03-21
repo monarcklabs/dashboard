@@ -1,0 +1,1 @@
+(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["object"==typeof document?document.currentScript:void 0,55410,e=>{"use strict";var t=e.i(71645),u=e.i(18566);function c({params:e}){let{id:c}=(0,t.use)(e),l=(0,u.useRouter)();return(0,t.useEffect)(()=>{l.replace(`/chat?agent=${c}`)},[c,l]),null}e.s(["default",()=>c])}]);

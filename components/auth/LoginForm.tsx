@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
-import { signIn } from 'next-auth/react'
+import { SignInButton, SignUpButton } from '@clerk/nextjs'
 import { TurnstileWidget } from '@/components/auth/TurnstileWidget'
 
 export function LoginForm({
@@ -16,6 +16,7 @@ export function LoginForm({
 }) {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(initialError ?? null)
+  const [verified, setVerified] = useState(false)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const [turnstileResetSignal, setTurnstileResetSignal] = useState(0)
   const startedRef = useRef(false)
@@ -23,7 +24,7 @@ export function LoginForm({
   const turnstileEnabled = Boolean(turnstileSiteKey)
   const hasBlockingError = Boolean(initialError)
 
-  const startLogin = useCallback(async (token: string | null) => {
+  const verifyLogin = useCallback(async (token: string | null) => {
     if (startedRef.current || hasBlockingError) return
     if (turnstileEnabled && !token) return
     startedRef.current = true
@@ -47,9 +48,8 @@ export function LoginForm({
         return
       }
 
-      await signIn('authentik', {
-        callbackUrl: nextPath,
-      })
+      setVerified(true)
+      return
     } catch {
       setError('Could not reach the login endpoint.')
       if (turnstileEnabled) {
@@ -63,15 +63,15 @@ export function LoginForm({
 
   useEffect(() => {
     if (!turnstileEnabled && !hasBlockingError) {
-      void startLogin(null)
+      void verifyLogin(null)
     }
-  }, [hasBlockingError, startLogin, turnstileEnabled])
+  }, [hasBlockingError, turnstileEnabled, verifyLogin])
 
   useEffect(() => {
     if (turnstileEnabled && turnstileToken && !hasBlockingError) {
-      void startLogin(turnstileToken)
+      void verifyLogin(turnstileToken)
     }
-  }, [hasBlockingError, startLogin, turnstileEnabled, turnstileToken])
+  }, [hasBlockingError, turnstileEnabled, turnstileToken, verifyLogin])
 
   return (
     <div className="flex flex-col gap-4">
@@ -111,6 +111,48 @@ export function LoginForm({
         </div>
       )}
 
+      {verified && !error && (
+        <div className="flex flex-col gap-3">
+          <SignInButton mode="modal" forceRedirectUrl={nextPath}>
+            <button
+              type="button"
+              style={{
+                width: '100%',
+                minHeight: '44px',
+                borderRadius: '14px',
+                border: '1px solid rgba(239,68,68,0.2)',
+                background: 'rgba(239,68,68,0.12)',
+                color: 'var(--text-primary)',
+                fontSize: '14px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Continue with Clerk
+            </button>
+          </SignInButton>
+
+          <SignUpButton mode="modal" forceRedirectUrl={nextPath}>
+            <button
+              type="button"
+              style={{
+                width: '100%',
+                minHeight: '44px',
+                borderRadius: '14px',
+                border: '1px solid var(--separator)',
+                background: 'transparent',
+                color: 'var(--text-secondary)',
+                fontSize: '14px',
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              Create your account
+            </button>
+          </SignUpButton>
+        </div>
+      )}
+
       <div
         style={{
           minHeight: '24px',
@@ -125,14 +167,16 @@ export function LoginForm({
         {pending ? (
           <>
             <Loader2 size={16} className="animate-spin" />
-            <span>Redirecting to login...</span>
+            <span>Preparing secure sign-in...</span>
           </>
         ) : hasBlockingError ? (
           <span>Resolve the login error and try again.</span>
+        ) : verified ? (
+          <span>Continue with Clerk to finish signing in.</span>
         ) : turnstileEnabled ? (
           <span>Complete the check to continue.</span>
         ) : (
-          <span>Preparing login...</span>
+          <span>Preparing secure sign-in...</span>
         )}
       </div>
     </div>

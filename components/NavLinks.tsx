@@ -3,9 +3,9 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Map, MessageSquare, Clock, Activity, Brain, Columns3, BookOpen, Settings, DollarSign, PlugZap, BriefcaseBusiness, LogOut } from 'lucide-react';
+import { Map, MessageSquare, Clock, Activity, Brain, Columns3, BookOpen, Settings, DollarSign, PlugZap, BriefcaseBusiness } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { signOut } from 'next-auth/react';
+import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs';
 import type { CronJob } from '@/lib/types';
 import { useSettings } from '@/app/settings-provider';
 import {
@@ -70,7 +70,6 @@ export function NavLinks({
   const agentCount = agents.length > 0 ? agents.length : null;
   const [cronCount, setCronCount] = useState<number | null>(null);
   const [cronErrorCount, setCronErrorCount] = useState<number | null>(null);
-  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     setIsClientFacingHost(isMonarckProductionHost(window.location.hostname));
@@ -100,17 +99,6 @@ export function NavLinks({
         setCronErrorCount(null);
       });
   }, [isClientFacingHost]);
-
-  async function handleLogout() {
-    if (loggingOut) return;
-    setLoggingOut(true);
-
-    try {
-      await signOut({ callbackUrl: '/login' });
-    } finally {
-      setLoggingOut(false);
-    }
-  }
 
   // Resolve badge content per nav item
   function getBadge(item: NavItem): React.ReactNode {
@@ -307,31 +295,61 @@ export function NavLinks({
                 {footerRole.slice(0, 1).toUpperCase() + footerRole.slice(1)}
               </div>
             </div>
-            {session && (
-              <button
-                type="button"
-                onClick={handleLogout}
-                disabled={loggingOut}
-                className="focus-ring"
-                aria-label="Sign out"
+            <Show when="signed-in">
+              <div
                 style={{
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--separator)',
-                  background: 'transparent',
-                  color: 'var(--text-secondary)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  cursor: loggingOut ? 'default' : 'pointer',
-                  opacity: loggingOut ? 0.6 : 1,
+                  width: '28px',
+                  height: '28px',
                 }}
               >
-                <LogOut size={14} />
-              </button>
-            )}
+                <UserButton />
+              </div>
+            </Show>
           </div>
+
+          <Show when="signed-out">
+            <div className="mt-3 flex gap-2">
+              <SignInButton mode="modal" forceRedirectUrl="/">
+                <button
+                  type="button"
+                  style={{
+                    flex: 1,
+                    minHeight: '34px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--separator)',
+                    background: 'transparent',
+                    color: 'var(--text-secondary)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Sign in
+                </button>
+              </SignInButton>
+              <SignUpButton mode="modal" forceRedirectUrl="/">
+                <button
+                  type="button"
+                  style={{
+                    flex: 1,
+                    minHeight: '34px',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(239,69,58,0.2)',
+                    background: 'rgba(239,69,58,0.12)',
+                    color: 'var(--text-primary)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Sign up
+                </button>
+              </SignUpButton>
+            </div>
+          </Show>
         </div>
       </div>
     </nav>

@@ -1,66 +1,67 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getToken } from 'next-auth/jwt'
-import { authIsConfigured } from '@/lib/auth'
-import {
-  getTurnstileWidgetConfigForHostname,
-  parseRequestHostname,
-  sanitizeReturnTo,
-} from '@/lib/auth/turnstile'
+import { clerkMiddleware } from '@clerk/nextjs/server'
+import { sanitizeReturnTo } from '@/lib/auth/turnstile'
+
+export interface ProxyAuthResult {
+  userId: string | null
+  orgSlug?: string | null
+}
+
+export type ProxyAuth = () => Promise<ProxyAuthResult>
+
+function getRequiredClientOrgSlug() {
+  return process.env.CLIENT_ORG_SLUG?.trim().toLowerCase() || ''
+}
 
 function isPublicPath(pathname: string): boolean {
   if (pathname === '/login') return true
+  if (pathname === '/unauthorized') return true
   if (pathname === '/api/auth/preflight') return true
-  if (pathname.startsWith('/api/auth/callback/')) return true
-  if (pathname === '/api/auth/error') return true
-  if (pathname === '/api/auth/session') return true
-  if (pathname === '/api/auth/signout') return true
-  if (pathname === '/api/auth/csrf') return true
-  if (pathname === '/api/auth/providers') return true
+  if (pathname === '/clerk-sync-keyless') return true
   return false
 }
 
-function configurationErrorResponse(request: NextRequest, message: string) {
-  if (request.nextUrl.pathname.startsWith('/api/')) {
-    return NextResponse.json({ error: message }, { status: 500 })
-  }
-
-  return new NextResponse(message, {
-    status: 500,
-    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-  })
-}
-
-export async function proxy(request: NextRequest) {
-  if (!authIsConfigured()) {
-    return configurationErrorResponse(
-      request,
-      'Authentik is not configured for this deployment.',
-    )
-  }
-
+export async function handleProxy(auth: ProxyAuth, request: NextRequest) {
   const pathname = request.nextUrl.pathname
-  const hostname =
-    parseRequestHostname(request.headers.get('x-forwarded-host')) ||
-    parseRequestHostname(request.headers.get('host'))
-
-  if (pathname.startsWith('/api/auth/signin/')) {
-    return NextResponse.next()
-  }
-
-  const token = await getToken({
-    req: request,
-    secret: process.env.NEXTAUTH_SECRET,
-  })
+  const authState = await auth()
 
   if (isPublicPath(pathname)) {
-    if (pathname === '/login' && token) {
-      const nextPath = sanitizeReturnTo(request.nextUrl.searchParams.get('next'))
-      return NextResponse.redirect(new URL(nextPath, request.url))
+    if (pathname === '/login') {
+      const { userId } = authState
+      if (userId) {
+        const nextPath = sanitizeReturnTo(request.nextUrl.searchParams.get('next'))
+        return NextResponse.redirect(new URL(nextPath, request.url))
+      }
     }
+
     return NextResponse.next()
   }
 
-  if (token) {
+  const { userId } = authState
+  if (userId) {
+    const requiredOrgSlug = getRequiredClientOrgSlug()
+    const activeOrgSlug = authState.orgSlug?.toLowerCase() || ''
+
+    if (requiredOrgSlug && activeOrgSlug !== requiredOrgSlug) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json(
+          {
+            error: 'Forbidden',
+            requiredOrg: requiredOrgSlug,
+            activeOrg: activeOrgSlug || null,
+          },
+          { status: 403 },
+        )
+      }
+
+      const unauthorizedUrl = new URL('/unauthorized', request.url)
+      unauthorizedUrl.searchParams.set('requiredOrg', requiredOrgSlug)
+      if (activeOrgSlug) {
+        unauthorizedUrl.searchParams.set('activeOrg', activeOrgSlug)
+      }
+      return NextResponse.redirect(unauthorizedUrl)
+    }
+
     return NextResponse.next()
   }
 
@@ -76,8 +77,11 @@ export async function proxy(request: NextRequest) {
   return NextResponse.redirect(loginUrl)
 }
 
+export default clerkMiddleware((auth, request) => handleProxy(auth, request))
+
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml)$).*)',
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/(api|trpc)(.*)',
   ],
 }

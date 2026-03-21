@@ -1,118 +1,109 @@
-import { getServerSession, type DefaultSession, type NextAuthOptions } from 'next-auth'
-import AuthentikProvider, { type AuthentikProfile } from 'next-auth/providers/authentik'
-import { parseRequestHostname } from '@/lib/auth/turnstile'
+import { auth, currentUser } from '@clerk/nextjs/server'
+import { parseRequestHostname, sanitizeReturnTo } from '@/lib/auth/turnstile'
 
-function requiredEnv(name: string) {
-  const value = process.env[name]?.trim()
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`)
-  }
-  return value
+interface ClerkEmailAddress {
+  id: string
+  emailAddress: string
 }
 
-export type DashboardSession = DefaultSession & {
-  user: DefaultSession['user'] & {
-    id?: string
-    username?: string | null
-    role?: string | null
+interface ClerkUserLike {
+  id: string
+  fullName: string | null
+  firstName: string | null
+  lastName: string | null
+  username: string | null
+  imageUrl: string
+  primaryEmailAddressId: string | null
+  primaryEmailAddress?: ClerkEmailAddress | null
+  emailAddresses?: ClerkEmailAddress[]
+  publicMetadata?: Record<string, unknown>
+}
+
+export type DashboardSession = {
+  user: {
+    id: string
+    name: string | null
+    email: string | null
+    image: string | null
+    username: string | null
+    role: string | null
+    orgId?: string | null
+    orgSlug?: string | null
+    orgRole?: string | null
   }
 }
 
-export function buildAuthOptions(): NextAuthOptions {
+function getPrimaryEmailAddress(user: ClerkUserLike) {
+  if (user.primaryEmailAddress?.emailAddress) {
+    return user.primaryEmailAddress.emailAddress
+  }
+
+  if (user.primaryEmailAddressId && Array.isArray(user.emailAddresses)) {
+    const primary = user.emailAddresses.find(
+      (email) => email.id === user.primaryEmailAddressId,
+    )
+    if (primary?.emailAddress) {
+      return primary.emailAddress
+    }
+  }
+
+  return user.emailAddresses?.[0]?.emailAddress || null
+}
+
+export function mapClerkUserToSession(user: ClerkUserLike): DashboardSession {
+  const metadataRole = user.publicMetadata?.role
+  const name =
+    user.fullName ||
+    [user.firstName, user.lastName].filter(Boolean).join(' ') ||
+    user.username ||
+    getPrimaryEmailAddress(user) ||
+    'User'
+
   return {
-    providers: [
-      AuthentikProvider({
-        issuer: requiredEnv('AUTHENTIK_ISSUER'),
-        clientId: requiredEnv('AUTHENTIK_CLIENT_ID'),
-        clientSecret: requiredEnv('AUTHENTIK_CLIENT_SECRET'),
-        profile(profile: AuthentikProfile) {
-          const username = profile.preferred_username || profile.email || profile.sub || 'user'
-          return {
-            id: profile.sub || username,
-            name: profile.name || username,
-            email: profile.email || null,
-            image: null,
-            username,
-            role: profile.groups?.[0] || null,
-          }
-        },
-      }),
-    ],
-    session: {
-      strategy: 'jwt',
+    user: {
+      id: user.id,
+      name,
+      email: getPrimaryEmailAddress(user),
+      image: user.imageUrl || null,
+      username: user.username,
+      role: typeof metadataRole === 'string' ? metadataRole : null,
     },
-    pages: {
-      signIn: '/login',
-    },
-    callbacks: {
-      async jwt({ token, user, profile }) {
-        if (user) {
-          token.sub = user.id
-          token.name = user.name
-          token.email = user.email
-          token.picture = user.image
-          token.username = (user as { username?: string }).username ?? null
-          token.role = (user as { role?: string | null }).role ?? null
-        }
-
-        if (profile) {
-          const authentikProfile = profile as AuthentikProfile
-          token.username =
-            authentikProfile.preferred_username ||
-            token.username ||
-            token.email ||
-            token.sub ||
-            null
-          token.role =
-            authentikProfile.groups?.[0] ||
-            token.role ||
-            null
-        }
-
-        return token
-      },
-      async session({ session, token }) {
-        return {
-          ...session,
-          user: {
-            ...session.user,
-            id: token.sub,
-            username: typeof token.username === 'string' ? token.username : null,
-            role: typeof token.role === 'string' ? token.role : null,
-          },
-        } satisfies DashboardSession
-      },
-      async redirect({ url, baseUrl }) {
-        if (url.startsWith('/')) return `${baseUrl}${url}`
-        if (url.startsWith(baseUrl)) return url
-        return baseUrl
-      },
-    },
-    secret: process.env.NEXTAUTH_SECRET,
   }
 }
 
-export function getCurrentSession() {
-  return getServerSession(buildAuthOptions()) as Promise<DashboardSession | null>
+export async function getCurrentSession(): Promise<DashboardSession | null> {
+  const authState = await auth()
+  const { userId } = authState
+  if (!userId) {
+    return null
+  }
+
+  const user = await currentUser()
+  if (!user) {
+    return null
+  }
+
+  const baseSession = mapClerkUserToSession(user as ClerkUserLike)
+
+  return {
+    ...baseSession,
+    user: {
+      ...baseSession.user,
+      orgId: authState.orgId ?? null,
+      orgSlug: authState.orgSlug ?? null,
+      orgRole: authState.orgRole ?? null,
+    },
+  }
 }
 
-export function getLoginProviderUrl(nextPath: string) {
-  const callbackUrl = nextPath.startsWith('/') ? nextPath : '/'
-  return `/api/auth/signin/authentik?callbackUrl=${encodeURIComponent(callbackUrl)}`
+export function getLoginUrl(nextPath: string) {
+  const callbackUrl = sanitizeReturnTo(nextPath)
+  return `/login?next=${encodeURIComponent(callbackUrl)}`
 }
 
 export function getRequestHost(headers: Headers): string {
   return (
     parseRequestHostname(headers.get('x-forwarded-host')) ||
     parseRequestHostname(headers.get('host'))
-  )
-}
-
-export function authIsConfigured() {
-  return Boolean(
-    process.env.AUTHENTIK_ISSUER?.trim() &&
-    process.env.AUTHENTIK_CLIENT_ID?.trim() &&
-    process.env.AUTHENTIK_CLIENT_SECRET?.trim() &&
-    process.env.NEXTAUTH_SECRET?.trim(),
   )
 }

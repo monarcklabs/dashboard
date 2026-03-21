@@ -1,22 +1,40 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { authIsConfigured, getLoginProviderUrl } from '@/lib/auth'
+import { describe, expect, it } from 'vitest'
+import { getLoginUrl, mapClerkUserToSession } from '@/lib/auth'
 
 describe('auth helpers', () => {
-  afterEach(() => {
-    vi.unstubAllEnvs()
+  it('maps Clerk users into the dashboard session shape', () => {
+    const session = mapClerkUserToSession({
+      id: 'user_123',
+      fullName: 'Rich Rosales',
+      firstName: 'Rich',
+      lastName: 'Rosales',
+      username: 'richrosales',
+      imageUrl: 'https://example.com/avatar.png',
+      primaryEmailAddressId: 'email_1',
+      primaryEmailAddress: {
+        id: 'email_1',
+        emailAddress: 'rich@monarck.ai',
+      },
+      emailAddresses: [],
+      publicMetadata: {
+        role: 'admin',
+      },
+    })
+
+    expect(session).toEqual({
+      user: {
+        id: 'user_123',
+        name: 'Rich Rosales',
+        email: 'rich@monarck.ai',
+        image: 'https://example.com/avatar.png',
+        username: 'richrosales',
+        role: 'admin',
+      },
+    })
   })
 
-  it('detects when authentik auth is configured', () => {
-    vi.stubEnv('AUTHENTIK_ISSUER', 'https://auth.example.com/application/o/clawport')
-    vi.stubEnv('AUTHENTIK_CLIENT_ID', 'client-id')
-    vi.stubEnv('AUTHENTIK_CLIENT_SECRET', 'client-secret')
-    vi.stubEnv('NEXTAUTH_SECRET', 'secret')
-
-    expect(authIsConfigured()).toBe(true)
-  })
-
-  it('builds the authentik sign-in url with a callback path', () => {
-    expect(getLoginProviderUrl('/chat')).toBe('/api/auth/signin/authentik?callbackUrl=%2Fchat')
-    expect(getLoginProviderUrl('https://evil.test')).toBe('/api/auth/signin/authentik?callbackUrl=%2F')
+  it('builds the login url with a sanitized callback path', () => {
+    expect(getLoginUrl('/chat')).toBe('/login?next=%2Fchat')
+    expect(getLoginUrl('https://evil.test')).toBe('/login?next=%2F')
   })
 })

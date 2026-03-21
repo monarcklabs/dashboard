@@ -1,0 +1,3 @@
+{
+  "/api/kanban/tickets/route": "app/api/kanban/tickets/route.js"
+}

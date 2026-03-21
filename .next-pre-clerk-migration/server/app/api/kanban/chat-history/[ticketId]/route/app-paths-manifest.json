@@ -1,0 +1,3 @@
+{
+  "/api/kanban/chat-history/[ticketId]/route": "app/api/kanban/chat-history/[ticketId]/route.js"
+}

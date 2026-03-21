@@ -83,15 +83,16 @@ clawport dev
 
 Open [http://localhost:3000](http://localhost:3000). The onboarding wizard walks you through naming your portal, picking a theme, and setting up your operator identity.
 
-For customer-facing deployments, wire the dashboard to a per-deployment authentik app in `.env.local`:
+For customer-facing deployments, the dashboard now uses Clerk natively. Clerk supports keyless mode for initial setup, so you can run without keys first and claim the instance later.
 
 ```bash
-AUTHENTIK_ISSUER=https://auth.client1.monarck.ai/application/o/clawport
-AUTHENTIK_CLIENT_ID=...
-AUTHENTIK_CLIENT_SECRET=...
-NEXTAUTH_SECRET=...
-NEXTAUTH_URL=https://client1.monarck.ai
+# Optional once you claim the Clerk instance:
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
+CLERK_SECRET_KEY=...
+CLIENT_ORG_SLUG=acme
 ```
+
+Set `CLIENT_ORG_SLUG` per client deployment. The dashboard middleware will only allow access when the signed-in user has that Clerk organization active.
 
 You can also enable Cloudflare Turnstile on the login form with `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, and `TURNSTILE_ALLOWED_HOSTNAMES`.
 
@@ -160,11 +161,11 @@ All AI calls -- chat, vision, TTS, transcription -- route through the gateway. O
 
 | Variable | Description |
 |----------|-------------|
-| `AUTHENTIK_ISSUER` | Issuer URL for this deployment's authentik application |
-| `AUTHENTIK_CLIENT_ID` | Authentik OAuth client ID |
-| `AUTHENTIK_CLIENT_SECRET` | Authentik OAuth client secret |
-| `NEXTAUTH_SECRET` | Session/JWT signing secret for Auth.js |
-| `NEXTAUTH_URL` | Public base URL for this dashboard deployment |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Optional Clerk publishable key once you claim the instance or move beyond keyless mode |
+| `CLERK_SECRET_KEY` | Optional Clerk secret key once you claim the instance or move beyond keyless mode |
+| `CLIENT_ORG_SLUG` | Required for client isolation. Only users with this Clerk organization active may access the deployment |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL` | Optional post-sign-in redirect override |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL` | Optional post-sign-up redirect override |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | Enables Cloudflare Turnstile on login with server-side Siteverify validation |
 | `TURNSTILE_ALLOWED_HOSTNAMES` | Comma-separated hostnames permitted to require Turnstile, for example `monarck.ai,app.monarck.ai` |
 | `ELEVENLABS_API_KEY` | ElevenLabs API key for voice indicators on agent profiles |

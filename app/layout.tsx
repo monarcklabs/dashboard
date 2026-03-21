@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { ClerkProvider } from '@clerk/nextjs';
 import './globals.css';
 import { ThemeProvider } from './providers';
 import { SettingsProvider } from './settings-provider';
@@ -21,11 +22,13 @@ export default async function RootLayout({
   return (
     <html lang="en" data-theme="dark" suppressHydrationWarning>
       <body>
-        <ThemeProvider>
-          <SettingsProvider>
-            <AppShell session={session}>{children}</AppShell>
-          </SettingsProvider>
-        </ThemeProvider>
+        <ClerkProvider>
+          <ThemeProvider>
+            <SettingsProvider>
+              <AppShell session={session}>{children}</AppShell>
+            </SettingsProvider>
+          </ThemeProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

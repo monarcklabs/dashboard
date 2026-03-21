@@ -1,7 +1,6 @@
 export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
-import { getLoginProviderUrl } from '@/lib/auth'
 import {
   PREAUTH_COOKIE_NAME,
   getPreauthCookieOptions,
@@ -35,7 +34,7 @@ export async function POST(request: Request) {
 
   const response = NextResponse.json({
     ok: true,
-    redirectTo: getLoginProviderUrl(nextPath),
+    nextPath,
   })
   response.cookies.set(PREAUTH_COOKIE_NAME, '1', getPreauthCookieOptions())
   return response

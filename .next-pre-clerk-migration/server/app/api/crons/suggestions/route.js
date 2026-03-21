@@ -1,0 +1,10 @@
+var R=require("../../../../chunks/[turbopack]_runtime.js")("server/app/api/crons/suggestions/route.js")
+R.c("server/chunks/[root-of-the-server]__bbd4a3f7._.js")
+R.c("server/chunks/lib_fa383252._.js")
+R.c("server/chunks/[root-of-the-server]__a6d31126._.js")
+R.c("server/chunks/[root-of-the-server]__8f5ebbc3._.js")
+R.c("server/chunks/node_modules_next_dist_esm_build_templates_app-route_bfab3e79.js")
+R.c("server/chunks/node_modules_openai_index_mjs_88cf4560._.js")
+R.c("server/chunks/_next-internal_server_app_api_crons_suggestions_route_actions_03d5fe66.js")
+R.m(99433)
+module.exports=R.m(99433).exports
