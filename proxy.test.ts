@@ -22,14 +22,13 @@ describe('auth proxy', () => {
     expect(response.status).toBe(200)
   })
 
-  it('redirects authenticated users away from the login page', async () => {
+  it('allows authenticated login requests through for the page to handle', async () => {
     const response = await handleProxy(
       async () => ({ userId: 'user_1' }),
       new NextRequest('http://localhost:3000/login?next=%2Fchat'),
     )
 
-    expect(response.status).toBe(307)
-    expect(response.headers.get('location')).toBe('http://localhost:3000/chat')
+    expect(response.status).toBe(200)
   })
 
   it('blocks signed-in users when the deployment org does not match the active org', async () => {

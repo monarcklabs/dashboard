@@ -23,20 +23,12 @@ function isPublicPath(pathname: string): boolean {
 
 export async function handleProxy(auth: ProxyAuth, request: NextRequest) {
   const pathname = request.nextUrl.pathname
-  const authState = await auth()
 
   if (isPublicPath(pathname)) {
-    if (pathname === '/login') {
-      const { userId } = authState
-      if (userId) {
-        const nextPath = sanitizeReturnTo(request.nextUrl.searchParams.get('next'))
-        return NextResponse.redirect(new URL(nextPath, request.url))
-      }
-    }
-
     return NextResponse.next()
   }
 
+  const authState = await auth()
   const { userId } = authState
   if (userId) {
     const requiredOrgSlug = getRequiredClientOrgSlug()
