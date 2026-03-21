@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { Loader2 } from 'lucide-react'
-import { Show } from '@clerk/nextjs'
 import { LoginForm } from '@/components/auth/LoginForm'
 import { MonarckMark } from '@/components/MonarckMark'
 import { APP_NAME } from '@/lib/branding'
@@ -98,13 +97,11 @@ export default async function LoginPage({
               : 'Continue with Clerk to sign in or create your first account.'}
           </p>
 
-          <Show when="signed-out">
-            <LoginForm
-              nextPath={nextPath}
-              turnstileSiteKey={turnstileConfig?.siteKey ?? null}
-              initialError={authError}
-            />
-          </Show>
+          <LoginForm
+            nextPath={nextPath}
+            turnstileSiteKey={turnstileConfig?.siteKey ?? null}
+            initialError={authError}
+          />
 
           <div
             style={{
