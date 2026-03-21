@@ -69,7 +69,17 @@ export async function handleProxy(auth: ProxyAuth, request: NextRequest) {
   return NextResponse.redirect(loginUrl)
 }
 
-export default clerkMiddleware((auth, request) => handleProxy(auth, request))
+const protectedMiddleware = clerkMiddleware((auth, request) =>
+  handleProxy(auth, request),
+)
+
+export default function proxy(request: NextRequest) {
+  if (isPublicPath(request.nextUrl.pathname)) {
+    return NextResponse.next()
+  }
+
+  return protectedMiddleware(request)
+}
 
 export const config = {
   matcher: [
