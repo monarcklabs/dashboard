@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { authIsConfigured } from '@/lib/auth'
 import {
-  PREAUTH_COOKIE_NAME,
   getTurnstileWidgetConfigForHostname,
   parseRequestHostname,
   sanitizeReturnTo,
@@ -43,29 +42,9 @@ export async function proxy(request: NextRequest) {
   const hostname =
     parseRequestHostname(request.headers.get('x-forwarded-host')) ||
     parseRequestHostname(request.headers.get('host'))
-  const turnstileEnabled = Boolean(getTurnstileWidgetConfigForHostname(hostname))
 
   if (pathname.startsWith('/api/auth/signin/')) {
-    if (!turnstileEnabled || request.cookies.get(PREAUTH_COOKIE_NAME)?.value === '1') {
-      const response = NextResponse.next()
-      if (turnstileEnabled) {
-        response.cookies.set(PREAUTH_COOKIE_NAME, '', {
-          httpOnly: true,
-          sameSite: 'lax',
-          secure: process.env.NODE_ENV === 'production',
-          path: '/',
-          maxAge: 0,
-        })
-      }
-      return response
-    }
-
-    const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set(
-      'next',
-      sanitizeReturnTo(request.nextUrl.searchParams.get('callbackUrl') || '/'),
-    )
-    return NextResponse.redirect(loginUrl)
+    return NextResponse.next()
   }
 
   const token = await getToken({

@@ -1,8 +1,7 @@
 'use client'
 
-import { FormEvent, useState } from 'react'
-import { Loader2, LogIn, ShieldCheck } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { TurnstileWidget } from '@/components/auth/TurnstileWidget'
 
 export function LoginForm({
@@ -16,17 +15,14 @@ export function LoginForm({
   const [error, setError] = useState<string | null>(null)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const [turnstileResetSignal, setTurnstileResetSignal] = useState(0)
+  const startedRef = useRef(false)
 
   const turnstileEnabled = Boolean(turnstileSiteKey)
-  const canSubmit = !pending && (!turnstileEnabled || Boolean(turnstileToken))
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (turnstileEnabled && !turnstileToken) {
-      setError('Complete the Turnstile check before continuing.')
-      return
-    }
-
+  const startLogin = useCallback(async (token: string | null) => {
+    if (startedRef.current) return
+    if (turnstileEnabled && !token) return
+    startedRef.current = true
     setPending(true)
     setError(null)
 
@@ -34,7 +30,7 @@ export function LoginForm({
       const response = await fetch('/api/auth/preflight', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nextPath, turnstileToken }),
+        body: JSON.stringify({ nextPath, turnstileToken: token }),
       })
 
       const data = await response.json().catch(() => ({}))
@@ -43,6 +39,7 @@ export function LoginForm({
         if (turnstileEnabled) {
           setTurnstileResetSignal((value) => value + 1)
         }
+        startedRef.current = false
         return
       }
 
@@ -57,35 +54,26 @@ export function LoginForm({
       if (turnstileEnabled) {
         setTurnstileResetSignal((value) => value + 1)
       }
+      startedRef.current = false
     } finally {
       setPending(false)
     }
-  }
+  }, [nextPath, turnstileEnabled])
+
+  useEffect(() => {
+    if (!turnstileEnabled) {
+      void startLogin(null)
+    }
+  }, [startLogin, turnstileEnabled])
+
+  useEffect(() => {
+    if (turnstileEnabled && turnstileToken) {
+      void startLogin(turnstileToken)
+    }
+  }, [startLogin, turnstileEnabled, turnstileToken])
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div
-        style={{
-          borderRadius: '16px',
-          border: '1px solid var(--separator)',
-          background: 'var(--material-ultra-thin)',
-          padding: '14px 16px',
-          display: 'flex',
-          gap: '12px',
-          alignItems: 'flex-start',
-        }}
-      >
-        <ShieldCheck size={18} style={{ color: 'var(--system-green)', marginTop: '2px' }} />
-        <div>
-          <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600 }}>
-            Authentik manages credentials
-          </div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: 1.6, marginTop: '4px' }}>
-            Password changes, resets, and account policy now live in authentik instead of this app.
-          </p>
-        </div>
-      </div>
-
+    <div className="flex flex-col gap-4">
       {error && (
         <div
           role="alert"
@@ -114,15 +102,36 @@ export function LoginForm({
           <TurnstileWidget
             siteKey={turnstileSiteKey}
             resetSignal={turnstileResetSignal}
-            onTokenChange={setTurnstileToken}
+            onTokenChange={(token) => {
+              setError(null)
+              setTurnstileToken(token)
+            }}
           />
         </div>
       )}
 
-      <Button type="submit" size="lg" disabled={!canSubmit} className="w-full">
-        {pending ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
-        {pending ? 'Redirecting...' : 'Continue to login'}
-      </Button>
-    </form>
+      <div
+        style={{
+          minHeight: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '10px',
+          color: 'var(--text-secondary)',
+          fontSize: '13px',
+        }}
+      >
+        {pending ? (
+          <>
+            <Loader2 size={16} className="animate-spin" />
+            <span>Redirecting to login...</span>
+          </>
+        ) : turnstileEnabled ? (
+          <span>Complete the check to continue.</span>
+        ) : (
+          <span>Preparing login...</span>
+        )}
+      </div>
+    </div>
   )
 }
