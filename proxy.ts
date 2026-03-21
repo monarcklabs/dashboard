@@ -1,4 +1,4 @@
-import { NextFetchEvent, NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { clerkMiddleware } from '@clerk/nextjs/server'
 import { sanitizeReturnTo } from '@/lib/auth/turnstile'
 
@@ -69,17 +69,7 @@ export async function handleProxy(auth: ProxyAuth, request: NextRequest) {
   return NextResponse.redirect(loginUrl)
 }
 
-const protectedMiddleware = clerkMiddleware((auth, request) =>
-  handleProxy(auth, request),
-)
-
-export default function proxy(request: NextRequest, event: NextFetchEvent) {
-  if (isPublicPath(request.nextUrl.pathname)) {
-    return NextResponse.next()
-  }
-
-  return protectedMiddleware(request, event)
-}
+export default clerkMiddleware((auth, request) => handleProxy(auth, request))
 
 export const config = {
   matcher: [
