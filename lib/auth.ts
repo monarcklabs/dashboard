@@ -72,27 +72,31 @@ export function mapClerkUserToSession(user: ClerkUserLike): DashboardSession {
 }
 
 export async function getCurrentSession(): Promise<DashboardSession | null> {
-  const authState = await auth()
-  const { userId } = authState
-  if (!userId) {
+  try {
+    const authState = await auth()
+    const { userId } = authState
+    if (!userId) {
+      return null
+    }
+
+    const user = await currentUser()
+    if (!user) {
+      return null
+    }
+
+    const baseSession = mapClerkUserToSession(user as ClerkUserLike)
+
+    return {
+      ...baseSession,
+      user: {
+        ...baseSession.user,
+        orgId: authState.orgId ?? null,
+        orgSlug: authState.orgSlug ?? null,
+        orgRole: authState.orgRole ?? null,
+      },
+    }
+  } catch {
     return null
-  }
-
-  const user = await currentUser()
-  if (!user) {
-    return null
-  }
-
-  const baseSession = mapClerkUserToSession(user as ClerkUserLike)
-
-  return {
-    ...baseSession,
-    user: {
-      ...baseSession.user,
-      orgId: authState.orgId ?? null,
-      orgSlug: authState.orgSlug ?? null,
-      orgRole: authState.orgRole ?? null,
-    },
   }
 }
 
