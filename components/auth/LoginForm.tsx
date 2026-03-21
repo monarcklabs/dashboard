@@ -7,20 +7,23 @@ import { TurnstileWidget } from '@/components/auth/TurnstileWidget'
 export function LoginForm({
   nextPath,
   turnstileSiteKey,
+  initialError,
 }: {
   nextPath: string
   turnstileSiteKey: string | null
+  initialError?: string | null
 }) {
   const [pending, setPending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(initialError ?? null)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const [turnstileResetSignal, setTurnstileResetSignal] = useState(0)
   const startedRef = useRef(false)
 
   const turnstileEnabled = Boolean(turnstileSiteKey)
+  const hasBlockingError = Boolean(initialError)
 
   const startLogin = useCallback(async (token: string | null) => {
-    if (startedRef.current) return
+    if (startedRef.current || hasBlockingError) return
     if (turnstileEnabled && !token) return
     startedRef.current = true
     setPending(true)
@@ -58,19 +61,19 @@ export function LoginForm({
     } finally {
       setPending(false)
     }
-  }, [nextPath, turnstileEnabled])
+  }, [hasBlockingError, nextPath, turnstileEnabled])
 
   useEffect(() => {
-    if (!turnstileEnabled) {
+    if (!turnstileEnabled && !hasBlockingError) {
       void startLogin(null)
     }
-  }, [startLogin, turnstileEnabled])
+  }, [hasBlockingError, startLogin, turnstileEnabled])
 
   useEffect(() => {
-    if (turnstileEnabled && turnstileToken) {
+    if (turnstileEnabled && turnstileToken && !hasBlockingError) {
       void startLogin(turnstileToken)
     }
-  }, [startLogin, turnstileEnabled, turnstileToken])
+  }, [hasBlockingError, startLogin, turnstileEnabled, turnstileToken])
 
   return (
     <div className="flex flex-col gap-4">
@@ -126,6 +129,8 @@ export function LoginForm({
             <Loader2 size={16} className="animate-spin" />
             <span>Redirecting to login...</span>
           </>
+        ) : hasBlockingError ? (
+          <span>Resolve the login error and try again.</span>
         ) : turnstileEnabled ? (
           <span>Complete the check to continue.</span>
         ) : (

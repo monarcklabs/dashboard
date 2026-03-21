@@ -1,13 +1,6 @@
 import { getServerSession, type DefaultSession, type NextAuthOptions } from 'next-auth'
+import AuthentikProvider, { type AuthentikProfile } from 'next-auth/providers/authentik'
 import { parseRequestHostname } from '@/lib/auth/turnstile'
-
-type AuthentikProfile = {
-  sub?: string
-  email?: string
-  name?: string
-  preferred_username?: string
-  groups?: string[]
-}
 
 function requiredEnv(name: string) {
   const value = process.env[name]?.trim()
@@ -28,15 +21,10 @@ export type DashboardSession = DefaultSession & {
 export function buildAuthOptions(): NextAuthOptions {
   return {
     providers: [
-      {
-        id: 'authentik',
-        name: 'authentik',
-        type: 'oauth',
-        wellKnown: `${requiredEnv('AUTHENTIK_ISSUER')}/.well-known/openid-configuration`,
+      AuthentikProvider({
+        issuer: requiredEnv('AUTHENTIK_ISSUER'),
         clientId: requiredEnv('AUTHENTIK_CLIENT_ID'),
         clientSecret: requiredEnv('AUTHENTIK_CLIENT_SECRET'),
-        authorization: { params: { scope: 'openid profile email' } },
-        checks: ['pkce', 'state'],
         profile(profile: AuthentikProfile) {
           const username = profile.preferred_username || profile.email || profile.sub || 'user'
           return {
@@ -48,7 +36,7 @@ export function buildAuthOptions(): NextAuthOptions {
             role: profile.groups?.[0] || null,
           }
         },
-      },
+      }),
     ],
     session: {
       strategy: 'jwt',

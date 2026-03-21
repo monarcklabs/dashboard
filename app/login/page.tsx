@@ -13,7 +13,7 @@ import {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>
+  searchParams: Promise<{ next?: string; error?: string }>
 }) {
   if (!authIsConfigured()) {
     return (
@@ -52,6 +52,7 @@ export default async function LoginPage({
     getRequestHost(requestHeaders),
   )
   const nextPath = sanitizeReturnTo(params.next)
+  const authError = mapAuthError(params.error)
   const session = await getCurrentSession()
 
   if (session) {
@@ -120,7 +121,9 @@ export default async function LoginPage({
               textAlign: 'center',
             }}
           >
-            {turnstileConfig?.siteKey
+            {authError
+              ? authError
+              : turnstileConfig?.siteKey
               ? 'Complete the security check and you will be redirected to sign in.'
               : 'Redirecting to sign in.'}
           </p>
@@ -128,6 +131,7 @@ export default async function LoginPage({
           <LoginForm
             nextPath={nextPath}
             turnstileSiteKey={turnstileConfig?.siteKey ?? null}
+            initialError={authError}
           />
 
           <div
@@ -148,4 +152,23 @@ export default async function LoginPage({
       </div>
     </div>
   )
+}
+
+function mapAuthError(error: string | undefined): string | null {
+  if (!error) return null
+
+  switch (error) {
+    case 'Configuration':
+      return 'Authentication is misconfigured for this dashboard.'
+    case 'AccessDenied':
+      return 'Access was denied by the identity provider.'
+    case 'OAuthSignin':
+    case 'OAuthCallback':
+    case 'OAuthCreateAccount':
+      return 'The identity provider could not complete sign-in.'
+    case 'Callback':
+      return 'The authentication callback was rejected.'
+    default:
+      return `Login failed: ${error}`
+  }
 }
