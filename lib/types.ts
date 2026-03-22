@@ -355,3 +355,20 @@ export interface LiveLogLine {
   message: string
   raw?: string
 }
+
+// ── Docs Browser Types ─────────────────────────────────────
+
+export type DocFileType = 'md' | 'html' | 'json' | 'csv' | 'txt' | 'pdf' | 'xlsx' | 'unknown'
+
+export type DocCategory = 'root' | 'agent' | 'docs' | 'output' | 'other'
+
+export interface DocFileInfo {
+  name: string             // filename, e.g. "report.md"
+  relativePath: string     // relative to workspace, e.g. "agents/vera/output/report.md"
+  fileType: DocFileType
+  category: DocCategory
+  agentId: string | null   // populated if file is inside an agent subdirectory
+  tags: string[]           // auto-generated tags: [fileType, category, agentId?]
+  sizeBytes: number
+  lastModified: string     // ISO 8601
+}

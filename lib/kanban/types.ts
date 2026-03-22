@@ -15,6 +15,19 @@ export type TeamRole = 'lead-dev' | 'ux-ui' | 'qa'
 
 export type WorkState = 'idle' | 'starting' | 'working' | 'done' | 'failed'
 
+export type ProjectStatus = 'planning' | 'active' | 'complete'
+
+export interface Project {
+  id: string
+  name: string
+  description: string
+  status: ProjectStatus
+  priority: TicketPriority
+  agentId: string | null       // lead agent
+  createdAt: number
+  updatedAt: number
+}
+
 export interface KanbanTicket {
   id: string
   title: string
@@ -25,6 +38,7 @@ export interface KanbanTicket {
   priority: TicketPriority
   assigneeId: string | null   // agent id from agents.json
   assigneeRole: TeamRole | null
+  projectId: string | null     // project grouping
   workState: WorkState
   workStartedAt: number | null
   workError: string | null

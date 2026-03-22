@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { parseSchedule, describeCron, formatDuration, parseScheduleSlots, timeAgo, nextRunLabel } from './cron-utils'
+import { parseSchedule, describeCron, formatDuration, parseScheduleSlots, timeAgo, nextRunLabel, isHighFrequency, getFrequencyLabel } from './cron-utils'
 
 // --- parseSchedule ---
 
@@ -343,5 +343,75 @@ describe('nextRunLabel', () => {
     const d = new Date(NOW).toISOString()
     // diff = 0, which is not < 0, so not "overdue". mins=0, 0 < 60 → "in 0m"
     expect(nextRunLabel(d)).toBe('in 0m')
+  })
+})
+
+// --- isHighFrequency ---
+
+describe('isHighFrequency', () => {
+  it('returns true for every-minute cron', () => {
+    expect(isHighFrequency('* * * * *')).toBe(true)
+  })
+
+  it('returns true for */N minute intervals', () => {
+    expect(isHighFrequency('*/5 * * * *')).toBe(true)
+    expect(isHighFrequency('*/15 * * * *')).toBe(true)
+  })
+
+  it('returns true for every-hour cron', () => {
+    expect(isHighFrequency('0 * * * *')).toBe(true)
+  })
+
+  it('returns true for */N hour intervals', () => {
+    expect(isHighFrequency('0 */2 * * *')).toBe(true)
+  })
+
+  it('returns true for 4+ times daily', () => {
+    expect(isHighFrequency('0 0,6,12,18 * * *')).toBe(true)
+  })
+
+  it('returns false for normal daily crons', () => {
+    expect(isHighFrequency('0 8 * * *')).toBe(false)
+  })
+
+  it('returns false for weekly crons', () => {
+    expect(isHighFrequency('0 8 * * 1')).toBe(false)
+  })
+
+  it('returns false for 3x daily', () => {
+    expect(isHighFrequency('0 8,12,18 * * *')).toBe(false)
+  })
+
+  it('returns false for empty/invalid', () => {
+    expect(isHighFrequency('')).toBe(false)
+    expect(isHighFrequency('bad')).toBe(false)
+  })
+})
+
+// --- getFrequencyLabel ---
+
+describe('getFrequencyLabel', () => {
+  it('labels every-minute cron', () => {
+    expect(getFrequencyLabel('* * * * *')).toBe('Every minute')
+  })
+
+  it('labels */N minute intervals', () => {
+    expect(getFrequencyLabel('*/5 * * * *')).toBe('Every 5 min')
+  })
+
+  it('labels every-hour cron', () => {
+    expect(getFrequencyLabel('0 * * * *')).toBe('Every hour')
+  })
+
+  it('labels */N hour intervals', () => {
+    expect(getFrequencyLabel('0 */3 * * *')).toBe('Every 3h')
+  })
+
+  it('labels multiple times daily', () => {
+    expect(getFrequencyLabel('0 0,6,12,18 * * *')).toBe('4x daily')
+  })
+
+  it('labels 5x daily', () => {
+    expect(getFrequencyLabel('0 0,4,8,12,16 * * *')).toBe('5x daily')
   })
 })

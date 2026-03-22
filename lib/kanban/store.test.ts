@@ -30,7 +30,7 @@ beforeEach(() => {
 })
 
 // Default work state fields for test tickets
-const WORK_DEFAULTS = { workState: 'idle' as const, workStartedAt: null, workError: null, workResult: null, relevantFiles: [] as import('./types').RelevantFile[] }
+const WORK_DEFAULTS = { workState: 'idle' as const, workStartedAt: null, workError: null, workResult: null, relevantFiles: [] as import('./types').RelevantFile[], projectId: null }
 
 describe('loadTickets', () => {
   it('returns empty object when nothing stored', () => {
@@ -76,6 +76,7 @@ describe('createTicket', () => {
       priority: 'medium',
       assigneeId: null,
       assigneeRole: null,
+      projectId: null,
     })
 
     const ticket = result['test-uuid-1']
@@ -113,6 +114,7 @@ describe('createTicket', () => {
       priority: 'medium',
       assigneeId: null,
       assigneeRole: null,
+      projectId: null,
     })
     expect(result['existing']).toBeDefined()
     expect(Object.keys(result)).toHaveLength(2)

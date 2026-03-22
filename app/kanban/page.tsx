@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import type { KanbanTicket, RelevantFile, TicketStatus, TicketPriority, TeamRole } from '@/lib/kanban/types'
+import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import type { KanbanTicket, RelevantFile, TicketStatus, TicketPriority, TeamRole, Project } from '@/lib/kanban/types'
 import { useAgentsContext } from '@/app/agents-provider'
 import {
   loadTickets,
@@ -14,13 +16,16 @@ import {
   type KanbanStore,
 } from '@/lib/kanban/store'
 import { useAgentWork } from '@/lib/kanban/useAgentWork'
-import { Plus } from 'lucide-react'
+import { Plus, Activity, X, ArrowLeft } from 'lucide-react'
+import { loadProjects, type ProjectStore } from '@/lib/kanban/projects-store'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 import { CreateTicketModal } from '@/components/kanban/CreateTicketModal'
 import { TicketDetailPanel } from '@/components/kanban/TicketDetailPanel'
+import { KanbanActivityPanel } from '@/components/kanban/KanbanActivityPanel'
 import { AgentAvatar } from '@/components/AgentAvatar'
 import { ErrorState } from '@/components/ErrorState'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useSettings } from '@/app/settings-provider'
 
 export default function KanbanPage() {
   const [tickets, setTickets] = useState<KanbanStore>({})
@@ -31,6 +36,35 @@ export default function KanbanPage() {
   const [selectedTicket, setSelectedTicket] = useState<KanbanTicket | null>(null)
   const [filterAgentId, setFilterAgentId] = useState<string | null>(null)
   const [hydrated, setHydrated] = useState(false)
+  const { settings, setKanbanActivityOpen } = useSettings()
+  const [activityOpen, setActivityOpen] = useState(false)
+  const searchParams = useSearchParams()
+  const projectId = searchParams.get('project')
+  const [projectsStore, setProjectsStore] = useState<ProjectStore>({})
+  const activeProject: Project | null = projectId ? projectsStore[projectId] ?? null : null
+
+  // Load projects for filtering
+  useEffect(() => {
+    setProjectsStore(loadProjects())
+    fetch('/api/kanban/projects')
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((remote: ProjectStore) => {
+        setProjectsStore((prev) => {
+          const local = loadProjects()
+          const merged = { ...remote }
+          for (const [id, p] of Object.entries(local)) {
+            if (!merged[id] || p.updatedAt >= merged[id].updatedAt) merged[id] = p
+          }
+          return merged
+        })
+      })
+      .catch(() => {})
+  }, [])
+
+  // Sync with persisted setting after hydration
+  useEffect(() => {
+    setActivityOpen(settings.kanbanActivityOpen)
+  }, [settings.kanbanActivityOpen])
 
   // Wrapper that persists to localStorage synchronously during the state update,
   // so the data survives even if the user refreshes before effects run.
@@ -139,6 +173,7 @@ export default function KanbanPage() {
     persistTickets((prev) =>
       createTicket(prev, {
         ...data,
+        projectId: projectId || null,
         status: 'backlog',
       }),
     )
@@ -194,11 +229,16 @@ export default function KanbanPage() {
     ? agents.find((a) => a.id === selectedTicket.assigneeId) ?? null
     : null
 
-  const ticketCount = Object.keys(tickets).length
+  // Filter tickets by project when active
+  const visibleTickets: KanbanStore = projectId
+    ? Object.fromEntries(Object.entries(tickets).filter(([, t]) => t.projectId === projectId))
+    : tickets
+
+  const ticketCount = Object.keys(visibleTickets).length
 
   // Agents that have at least one ticket assigned
   const assignedAgentIds = new Set(
-    Object.values(tickets)
+    Object.values(visibleTickets)
       .map((t) => t.assigneeId)
       .filter(Boolean),
   )
@@ -220,17 +260,49 @@ export default function KanbanPage() {
           }}
         >
           <div>
-            <h1
-              style={{
-                fontSize: 'var(--text-title2)',
-                fontWeight: 'var(--weight-bold)',
-                color: 'var(--text-primary)',
-                margin: 0,
-                letterSpacing: '-0.3px',
-              }}
-            >
-              Kanban Board
-            </h1>
+            {activeProject ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 2 }}>
+                  <Link
+                    href="/projects"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--space-1)',
+                      fontSize: 'var(--text-caption1)',
+                      color: 'var(--text-tertiary)',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    <ArrowLeft size={12} />
+                    Projects
+                  </Link>
+                </div>
+                <h1
+                  style={{
+                    fontSize: 'var(--text-title2)',
+                    fontWeight: 'var(--weight-bold)',
+                    color: 'var(--text-primary)',
+                    margin: 0,
+                    letterSpacing: '-0.3px',
+                  }}
+                >
+                  {activeProject.name}
+                </h1>
+              </>
+            ) : (
+              <h1
+                style={{
+                  fontSize: 'var(--text-title2)',
+                  fontWeight: 'var(--weight-bold)',
+                  color: 'var(--text-primary)',
+                  margin: 0,
+                  letterSpacing: '-0.3px',
+                }}
+              >
+                Kanban Board
+              </h1>
+            )}
             <p
               style={{
                 fontSize: 'var(--text-caption1)',
@@ -242,23 +314,48 @@ export default function KanbanPage() {
             </p>
           </div>
 
-          <button
-            onClick={() => setCreateOpen(true)}
-            className="btn-primary focus-ring btn-scale"
-            style={{
-              borderRadius: 'var(--radius-md)',
-              padding: '8px 16px',
-              fontSize: 'var(--text-footnote)',
-              fontWeight: 'var(--weight-semibold)',
-              border: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--space-2)',
-            }}
-          >
-            <Plus size={16} />
-            New Ticket
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <button
+              onClick={() => {
+                const next = !activityOpen
+                setActivityOpen(next)
+                setKanbanActivityOpen(next)
+              }}
+              className="focus-ring"
+              title={activityOpen ? 'Hide activity feed' : 'Show activity feed'}
+              style={{
+                borderRadius: 'var(--radius-md)',
+                padding: '8px',
+                fontSize: 'var(--text-footnote)',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                cursor: 'pointer',
+                background: activityOpen ? 'var(--accent-fill, rgba(99,102,241,0.15))' : 'var(--fill-tertiary)',
+                color: activityOpen ? 'var(--accent)' : 'var(--text-secondary)',
+              }}
+            >
+              <Activity size={16} />
+            </button>
+
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="btn-primary focus-ring btn-scale"
+              style={{
+                borderRadius: 'var(--radius-md)',
+                padding: '8px 16px',
+                fontSize: 'var(--text-footnote)',
+                fontWeight: 'var(--weight-semibold)',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+              }}
+            >
+              <Plus size={16} />
+              New Ticket
+            </button>
+          </div>
         </div>
 
         {/* Agent filter bar */}
@@ -347,7 +444,7 @@ export default function KanbanPage() {
             </div>
           ) : (
             <KanbanBoard
-              tickets={tickets}
+              tickets={visibleTickets}
               agents={agents}
               onTicketClick={handleTicketClick}
               onMoveTicket={handleMoveTicket}
@@ -358,6 +455,17 @@ export default function KanbanPage() {
           )}
         </div>
       </div>
+
+      {/* Activity feed panel */}
+      <KanbanActivityPanel
+        isOpen={activityOpen}
+        onClose={() => {
+          setActivityOpen(false)
+          setKanbanActivityOpen(false)
+        }}
+        agents={agents}
+        tickets={tickets}
+      />
 
       {/* Detail backdrop */}
       {selectedTicket && (

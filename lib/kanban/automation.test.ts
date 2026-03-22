@@ -15,6 +15,7 @@ function makeTicket(overrides: Partial<KanbanTicket> = {}): KanbanTicket {
     priority: 'high',
     assigneeId: 'agent-1',
     assigneeRole: 'lead-dev',
+    projectId: null,
     workState: 'idle',
     workStartedAt: null,
     workError: null,

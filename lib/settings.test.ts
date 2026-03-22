@@ -36,6 +36,7 @@ describe('loadSettings', () => {
       operatorName: null,
       agentOverrides: {},
       liveStreamPosition: null,
+      kanbanActivityOpen: false,
     })
   })
 
@@ -92,6 +93,7 @@ describe('saveSettings', () => {
       operatorName: null,
       agentOverrides: {},
       liveStreamPosition: null,
+      kanbanActivityOpen: false,
     }
     saveSettings(settings)
     expect(localStorageMock.setItem).toHaveBeenCalledWith(
@@ -114,6 +116,7 @@ describe('saveSettings', () => {
         vera: { emoji: '🧙', profileImage: 'data:image/jpeg;base64,abc' },
       },
       liveStreamPosition: null,
+      kanbanActivityOpen: false,
     }
     saveSettings(settings)
     const loaded = loadSettings()

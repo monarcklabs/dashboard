@@ -8,9 +8,10 @@ import { useAgentsContext } from "@/app/agents-provider";
 import type { Pipeline } from "@/lib/cron-pipelines";
 import { formatDuration, timeAgo, nextRunLabel } from "@/lib/cron-utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RefreshCw, BarChart3, Calendar, GitBranch, Copy, Check } from "lucide-react";
+import { RefreshCw, BarChart3, Calendar, GitBranch, Copy, Check, Clock } from "lucide-react";
 import { ErrorState } from "@/components/ErrorState";
 import { WeeklySchedule } from "@/components/crons/WeeklySchedule";
+import { CronCalendar } from "@/components/crons/CronCalendar";
 const PipelineGraph = dynamic(() => import("@/components/crons/PipelineGraph").then(m => ({ default: m.PipelineGraph })), { ssr: false });
 import { PipelineDetailPanel } from "@/components/crons/PipelineDetailPanel";
 import { PipelineWizard } from "@/components/crons/PipelineWizard";
@@ -18,7 +19,7 @@ import { PipelineWizard } from "@/components/crons/PipelineWizard";
 /* ─── Types ─────────────────────────────────────────────────────── */
 
 type Filter = "all" | "ok" | "error" | "idle";
-type Tab = "overview" | "schedule" | "pipelines";
+type Tab = "calendar" | "overview" | "schedule" | "pipelines";
 
 const STATUS_DOT: Record<string, string> = {
   ok: "var(--system-green)",
@@ -34,12 +35,14 @@ const PILLS: { key: Filter; label: string; dotColor: string }[] = [
 ];
 
 const TAB_ICONS: Record<Tab, React.ComponentType<{ size: number; className?: string }>> = {
+  calendar: Calendar,
   overview: BarChart3,
-  schedule: Calendar,
+  schedule: Clock,
   pipelines: GitBranch,
 };
 
 const TABS: { key: Tab; label: string }[] = [
+  { key: "calendar", label: "Calendar" },
   { key: "overview", label: "Overview" },
   { key: "schedule", label: "Schedule" },
   { key: "pipelines", label: "Pipelines" },
@@ -524,7 +527,7 @@ export default function CronsPage() {
   const [crons, setCrons] = useState<CronJob[]>([]);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<Tab>("calendar");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [loading, setLoading] = useState(true);
@@ -713,6 +716,13 @@ export default function CronsPage() {
           </>
         ) : (
           <>
+            {/* ─── CALENDAR TAB ────────────────────────────── */}
+            {tab === "calendar" && (
+              <div style={{ flex: 1, minHeight: 0 }}>
+                <CronCalendar crons={filtered} agents={agents} />
+              </div>
+            )}
+
             {/* ─── OVERVIEW TAB ─────────────────────────────── */}
             {tab === "overview" && (
               <>

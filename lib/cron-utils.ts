@@ -203,3 +203,69 @@ export function describeCron(expression: string): string {
 
   return expression
 }
+
+/**
+ * Determine if a cron expression represents a high-frequency job
+ * that should go in the "Always Running" section rather than the calendar grid.
+ * High-frequency = runs multiple times per hour, every hour, or every N hours.
+ */
+export function isHighFrequency(expression: string): boolean {
+  if (!expression || !expression.trim()) return false
+  const parts = expression.trim().split(/\s+/)
+  if (parts.length !== 5) return false
+
+  const [min, hour] = parts
+
+  // Minute field is * or */N → runs multiple times per hour
+  if (min === '*' || min.startsWith('*/')) return true
+
+  // Hour field is * or */N → runs every hour or every N hours
+  if (hour === '*' || hour.startsWith('*/')) return true
+
+  // Hour field has multiple values (e.g. "0,6,12,18") → 4+ runs per day
+  if (hour.includes(',')) {
+    const count = hour.split(',').length
+    if (count >= 4) return true
+  }
+
+  return false
+}
+
+/**
+ * Get a human-readable frequency label for a high-frequency cron expression.
+ * e.g. "Every 5 min", "Every hour", "4x daily"
+ */
+export function getFrequencyLabel(expression: string): string {
+  if (!expression || !expression.trim()) return ''
+  const parts = expression.trim().split(/\s+/)
+  if (parts.length !== 5) return expression
+
+  const [min, hour] = parts
+
+  // */N * → every N minutes
+  if (min.startsWith('*/')) {
+    const interval = parseInt(min.slice(2), 10)
+    if (!isNaN(interval)) return `Every ${interval} min`
+  }
+
+  // * * → every minute
+  if (min === '*' && hour === '*') return 'Every minute'
+  if (min === '*') return 'Every minute'
+
+  // N */M → every M hours
+  if (hour.startsWith('*/')) {
+    const interval = parseInt(hour.slice(2), 10)
+    if (!isNaN(interval)) return `Every ${interval}h`
+  }
+
+  // N * → every hour
+  if (hour === '*') return 'Every hour'
+
+  // Multiple hours: 0 0,6,12,18 → 4x daily
+  if (hour.includes(',')) {
+    const count = hour.split(',').length
+    return `${count}x daily`
+  }
+
+  return describeCron(expression)
+}

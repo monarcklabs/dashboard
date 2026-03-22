@@ -32,11 +32,12 @@ interface SettingsContextValue {
   clearAgentOverride: (agentId: string) => void
   getAgentDisplay: (agent: Agent) => AgentDisplay
   setLiveStreamPosition: (pos: { x: number; y: number } | null) => void
+  setKanbanActivityOpen: (open: boolean) => void
   resetAll: () => void
 }
 
 const SettingsContext = createContext<SettingsContextValue>({
-  settings: { accentColor: null, portalName: null, portalSubtitle: null, portalEmoji: null, portalIcon: null, iconBgHidden: false, emojiOnly: false, operatorName: null, agentOverrides: {}, liveStreamPosition: null },
+  settings: { accentColor: null, portalName: null, portalSubtitle: null, portalEmoji: null, portalIcon: null, iconBgHidden: false, emojiOnly: false, operatorName: null, agentOverrides: {}, liveStreamPosition: null, kanbanActivityOpen: false },
   setAccentColor: () => {},
   setPortalName: () => {},
   setPortalSubtitle: () => {},
@@ -49,6 +50,7 @@ const SettingsContext = createContext<SettingsContextValue>({
   clearAgentOverride: () => {},
   getAgentDisplay: (agent) => ({ emoji: agent.emoji }),
   setLiveStreamPosition: () => {},
+  setKanbanActivityOpen: () => {},
   resetAll: () => {},
 })
 
@@ -165,6 +167,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     [settings, update],
   )
 
+  const setKanbanActivityOpen = useCallback(
+    (open: boolean) => {
+      update({ ...settings, kanbanActivityOpen: open })
+    },
+    [settings, update],
+  )
+
   const getAgentDisplay = useCallback(
     (agent: Agent): AgentDisplay => {
       const override = settings.agentOverrides[agent.id]
@@ -189,6 +198,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       operatorName: null,
       agentOverrides: {},
       liveStreamPosition: null,
+      kanbanActivityOpen: false,
     }
     update(defaults)
   }, [update])
@@ -209,6 +219,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         clearAgentOverride,
         getAgentDisplay,
         setLiveStreamPosition,
+        setKanbanActivityOpen,
         resetAll,
       }}
     >

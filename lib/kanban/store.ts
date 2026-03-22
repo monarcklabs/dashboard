@@ -46,6 +46,7 @@ function sanitizeTicket(id: string, raw: Record<string, unknown>): KanbanTicket 
     priority,
     assigneeId: typeof raw.assigneeId === 'string' ? raw.assigneeId : null,
     assigneeRole: typeof raw.assigneeRole === 'string' ? raw.assigneeRole as KanbanTicket['assigneeRole'] : null,
+    projectId: typeof raw.projectId === 'string' ? raw.projectId : null,
     workState,
     workStartedAt: typeof raw.workStartedAt === 'number' ? raw.workStartedAt : null,
     workError: typeof raw.workError === 'string' ? raw.workError : null,

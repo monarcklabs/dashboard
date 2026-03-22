@@ -16,6 +16,7 @@ export interface ClawPortSettings {
   operatorName: string | null
   agentOverrides: Record<string, AgentOverride>
   liveStreamPosition: { x: number; y: number } | null
+  kanbanActivityOpen: boolean
 }
 
 const STORAGE_KEY = 'clawport-settings'
@@ -32,6 +33,7 @@ export const DEFAULTS: ClawPortSettings = {
   operatorName: null,
   agentOverrides: {},
   liveStreamPosition: null,
+  kanbanActivityOpen: false,
 }
 
 export function loadSettings(): ClawPortSettings {
@@ -68,6 +70,7 @@ export function loadSettings(): ClawPortSettings {
         typeof parsed.liveStreamPosition.y === 'number'
           ? { x: parsed.liveStreamPosition.x, y: parsed.liveStreamPosition.y }
           : null,
+      kanbanActivityOpen: typeof parsed.kanbanActivityOpen === 'boolean' ? parsed.kanbanActivityOpen : false,
     }
   } catch {
     return { ...DEFAULTS }

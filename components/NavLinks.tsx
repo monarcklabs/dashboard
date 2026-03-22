@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Map, MessageSquare, Clock, Activity, Brain, Columns3, BookOpen, Settings, DollarSign, PlugZap, BriefcaseBusiness } from 'lucide-react';
+import { Map, MessageSquare, Calendar, Activity, Brain, Columns3, FolderKanban, BookOpen, Settings, DollarSign, PlugZap, BriefcaseBusiness } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs';
 import type { CronJob } from '@/lib/types';
@@ -40,8 +40,9 @@ const NAV_ITEMS: NavItem[] = [
   { href: CLIENT_HUB_PATH, label: 'Client', icon: BriefcaseBusiness, clientOnly: true },
   { href: '/', label: 'Map', icon: Map, badge: 'agents' },
   { href: '/kanban', label: 'Kanban', icon: Columns3 },
+  { href: '/projects', label: 'Projects', icon: FolderKanban },
   { href: '/chat', label: 'Messages', icon: MessageSquare, badge: 'unread' },
-  { href: '/crons', label: 'Scheduled', icon: Clock, badge: 'errors' },
+  { href: '/crons', label: 'Calendar', icon: Calendar, badge: 'errors' },
   { href: '/activity', label: 'Activity', icon: Activity },
   { href: '/integrations', label: 'Integrations', icon: PlugZap },
   { href: '/costs', label: 'Costs', icon: DollarSign },
