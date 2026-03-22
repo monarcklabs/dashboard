@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { NextRequest } from 'next/server'
-import { handleProxy } from '@/middleware'
+import { handleProxy } from '@/proxy'
 
 describe('auth proxy', () => {
   it('redirects unauthenticated page requests to login', async () => {
