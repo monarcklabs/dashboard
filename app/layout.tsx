@@ -17,19 +17,35 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getCurrentSession()
+  let session = null
+  try {
+    session = await getCurrentSession()
+  } catch (err) {
+    console.error('[RootLayout] getCurrentSession error:', err)
+  }
 
-  return (
-    <html lang="en" data-theme="dark" suppressHydrationWarning>
-      <body>
-        <ClerkProvider>
-          <ThemeProvider>
-            <SettingsProvider>
-              <AppShell session={session}>{children}</AppShell>
-            </SettingsProvider>
-          </ThemeProvider>
-        </ClerkProvider>
-      </body>
-    </html>
-  );
+  try {
+    return (
+      <html lang="en" data-theme="dark" suppressHydrationWarning>
+        <body>
+          <ClerkProvider>
+            <ThemeProvider>
+              <SettingsProvider>
+                <AppShell session={session}>{children}</AppShell>
+              </SettingsProvider>
+            </ThemeProvider>
+          </ClerkProvider>
+        </body>
+      </html>
+    );
+  } catch (err) {
+    console.error('[RootLayout] render error:', err)
+    return (
+      <html lang="en">
+        <body>
+          <pre>Layout render error - check server logs</pre>
+        </body>
+      </html>
+    );
+  }
 }
