@@ -17,11 +17,13 @@ import {
 } from '@/lib/kanban/store'
 import { useAgentWork } from '@/lib/kanban/useAgentWork'
 import { Plus, Activity, X, ArrowLeft } from 'lucide-react'
-import { loadProjects, type ProjectStore } from '@/lib/kanban/projects-store'
+import { loadProjects, saveProjects, type ProjectStore } from '@/lib/kanban/projects-store'
+import { generateId } from '@/lib/id'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 import { CreateTicketModal } from '@/components/kanban/CreateTicketModal'
 import { TicketDetailPanel } from '@/components/kanban/TicketDetailPanel'
 import { KanbanActivityPanel } from '@/components/kanban/KanbanActivityPanel'
+import { CreateProjectModal } from '@/components/projects/CreateProjectModal'
 import { AgentAvatar } from '@/components/AgentAvatar'
 import { ErrorState } from '@/components/ErrorState'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -38,6 +40,7 @@ export default function KanbanPage() {
   const [hydrated, setHydrated] = useState(false)
   const { settings, setKanbanActivityOpen } = useSettings()
   const [activityOpen, setActivityOpen] = useState(false)
+  const [createProjectOpen, setCreateProjectOpen] = useState(false)
   const searchParams = useSearchParams()
   const projectId = searchParams.get('project')
   const [projectsStore, setProjectsStore] = useState<ProjectStore>({})
@@ -169,14 +172,35 @@ export default function KanbanPage() {
     priority: TicketPriority
     assigneeId: string | null
     assigneeRole: TeamRole | null
+    projectId: string | null
   }) {
     persistTickets((prev) =>
       createTicket(prev, {
         ...data,
-        projectId: projectId || null,
+        projectId: data.projectId,
         status: 'backlog',
       }),
     )
+  }
+
+  function handleCreateProject(data: {
+    name: string
+    description: string
+    status: Project['status']
+    priority: Project['priority']
+    agentId: string | null
+  }) {
+    const id = generateId()
+    const now = Date.now()
+    const project: Project = { ...data, id, createdAt: now, updatedAt: now }
+    const next = { ...projectsStore, [id]: project }
+    setProjectsStore(next)
+    saveProjects(next)
+    fetch('/api/kanban/projects', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(next),
+    }).catch(() => {})
   }
 
   function handleMoveTicket(ticketId: string, status: TicketStatus) {
@@ -499,7 +523,17 @@ export default function KanbanPage() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         agents={agents}
+        projects={projectsStore}
+        defaultProjectId={projectId}
+        onCreateProject={() => setCreateProjectOpen(true)}
         onSubmit={handleCreateTicket}
+      />
+
+      <CreateProjectModal
+        open={createProjectOpen}
+        onOpenChange={setCreateProjectOpen}
+        agents={agents}
+        onSubmit={handleCreateProject}
       />
     </div>
   )

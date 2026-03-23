@@ -91,7 +91,7 @@ export function LoginForm({
         </div>
       )}
 
-      {turnstileEnabled && turnstileSiteKey && (
+      {turnstileEnabled && turnstileSiteKey && !verified && (
         <div
           style={{
             borderRadius: '16px',

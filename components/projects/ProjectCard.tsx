@@ -4,6 +4,7 @@ import type { Project } from '@/lib/kanban/types'
 import type { Agent } from '@/lib/types'
 import { PRIORITY_COLORS } from '@/lib/kanban/types'
 import { AgentAvatar } from '@/components/AgentAvatar'
+import { Trash2 } from 'lucide-react'
 
 const STATUS_COLORS: Record<string, string> = {
   planning: 'var(--system-orange)',
@@ -22,9 +23,10 @@ interface ProjectCardProps {
   agent: Agent | null
   ticketCount: number
   onClick: () => void
+  onDelete?: (id: string) => void
 }
 
-export function ProjectCard({ project, agent, ticketCount, onClick }: ProjectCardProps) {
+export function ProjectCard({ project, agent, ticketCount, onClick, onDelete }: ProjectCardProps) {
   const statusColor = STATUS_COLORS[project.status] || 'var(--text-tertiary)'
 
   return (
@@ -67,18 +69,57 @@ export function ProjectCard({ project, agent, ticketCount, onClick }: ProjectCar
         }}>
           {project.name}
         </h3>
-        <span style={{
-          fontSize: 'var(--text-caption2)',
-          fontWeight: 'var(--weight-semibold)',
-          color: statusColor,
-          background: `color-mix(in srgb, ${statusColor} 12%, transparent)`,
-          padding: '2px 8px',
-          borderRadius: 'var(--radius-full)',
-          flexShrink: 0,
-          whiteSpace: 'nowrap',
-        }}>
-          {STATUS_LABELS[project.status] || project.status}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', flexShrink: 0 }}>
+          <span style={{
+            fontSize: 'var(--text-caption2)',
+            fontWeight: 'var(--weight-semibold)',
+            color: statusColor,
+            background: `color-mix(in srgb, ${statusColor} 12%, transparent)`,
+            padding: '2px 8px',
+            borderRadius: 'var(--radius-full)',
+            whiteSpace: 'nowrap',
+          }}>
+            {STATUS_LABELS[project.status] || project.status}
+          </span>
+          {onDelete && (
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (confirm(`Delete "${project.name}"?`)) onDelete(project.id)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  if (confirm(`Delete "${project.name}"?`)) onDelete(project.id)
+                }
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 24,
+                height: 24,
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--text-tertiary)',
+                cursor: 'pointer',
+                transition: 'color 150ms ease, background 150ms ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = 'var(--system-red)'
+                e.currentTarget.style.background = 'var(--fill-tertiary)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'var(--text-tertiary)'
+                e.currentTarget.style.background = 'transparent'
+              }}
+            >
+              <Trash2 size={14} />
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Description */}

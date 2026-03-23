@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Plus } from 'lucide-react'
 import type { Agent } from '@/lib/types'
-import type { TicketPriority, TeamRole, RelevantFile } from '@/lib/kanban/types'
+import type { TicketPriority, TeamRole, RelevantFile, Project } from '@/lib/kanban/types'
 import { PRIORITY_COLORS, ROLE_LABELS } from '@/lib/kanban/types'
 import { AgentPicker } from '@/components/kanban/AgentPicker'
 import { DriveFilePicker } from '@/components/kanban/DriveFilePicker'
@@ -19,6 +19,9 @@ interface CreateTicketModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   agents: Agent[]
+  projects?: Record<string, Project>
+  defaultProjectId?: string | null
+  onCreateProject?: () => void
   onSubmit: (ticket: {
     title: string
     description: string
@@ -27,6 +30,7 @@ interface CreateTicketModalProps {
     priority: TicketPriority
     assigneeId: string | null
     assigneeRole: TeamRole | null
+    projectId: string | null
   }) => void
 }
 
@@ -47,15 +51,19 @@ const initialState = {
   priority: 'medium' as TicketPriority,
   assigneeId: '' as string,
   assigneeRole: null as TeamRole | null,
+  projectId: '' as string,
 }
 
 export function CreateTicketModal({
   open,
   onOpenChange,
   agents,
+  projects = {},
+  defaultProjectId,
+  onCreateProject,
   onSubmit,
 }: CreateTicketModalProps) {
-  const [form, setForm] = useState(initialState)
+  const [form, setForm] = useState({ ...initialState, projectId: defaultProjectId ?? '' })
   const [driveEnabled, setDriveEnabled] = useState(false)
 
   useEffect(() => {
@@ -66,8 +74,8 @@ export function CreateTicketModal({
   }, [])
 
   const resetForm = useCallback(() => {
-    setForm(initialState)
-  }, [])
+    setForm({ ...initialState, projectId: defaultProjectId ?? '' })
+  }, [defaultProjectId])
 
   function handleOpenChange(next: boolean) {
     if (!next) resetForm()
@@ -86,6 +94,7 @@ export function CreateTicketModal({
       priority: form.priority,
       assigneeId: form.assigneeId || null,
       assigneeRole: form.assigneeId ? form.assigneeRole : null,
+      projectId: form.projectId || null,
     })
 
     resetForm()
@@ -238,6 +247,49 @@ export function CreateTicketModal({
               </span>
             </span>
           </label>
+
+          {/* Project */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+            <label
+              htmlFor="ticket-project"
+              style={{
+                fontSize: 'var(--text-caption1)',
+                fontWeight: 'var(--weight-medium)',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              Project
+            </label>
+            <select
+              id="ticket-project"
+              className="apple-input focus-ring"
+              value={form.projectId}
+              onChange={(e) => {
+                if (e.target.value === '__create__') {
+                  e.target.value = form.projectId
+                  onCreateProject?.()
+                } else {
+                  setForm((f) => ({ ...f, projectId: e.target.value }))
+                }
+              }}
+              style={{
+                fontSize: 'var(--text-body)',
+                color: form.projectId ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="">No project</option>
+              {Object.values(projects)
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              <option disabled>---</option>
+              <option value="__create__">+ Create Project</option>
+            </select>
+          </div>
 
           {/* Assignee + Priority */}
           <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>

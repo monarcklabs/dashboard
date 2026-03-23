@@ -43,10 +43,10 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/projects', label: 'Projects', icon: FolderKanban },
   { href: '/chat', label: 'Messages', icon: MessageSquare, badge: 'unread' },
   { href: '/crons', label: 'Calendar', icon: Calendar, badge: 'errors' },
-  { href: '/activity', label: 'Activity', icon: Activity },
+  // { href: '/activity', label: 'Activity', icon: Activity },
   { href: '/integrations', label: 'Integrations', icon: PlugZap },
   { href: '/costs', label: 'Costs', icon: DollarSign },
-  { href: '/memory', label: 'Memory', icon: Brain },
+  // { href: '/memory', label: 'Memory', icon: Brain },
   { href: '/docs', label: 'Docs', icon: BookOpen },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];

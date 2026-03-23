@@ -49,3 +49,4 @@ reddit-post.md
 
 # clerk configuration (can include secrets)
 /.clerk/
+.tmp/

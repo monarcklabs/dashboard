@@ -8,10 +8,11 @@ import type { Project } from '@/lib/kanban/types'
 import {
   loadProjects,
   saveProjects,
-  createProject,
+  deleteProject,
   mergeProjectStores,
   type ProjectStore,
 } from '@/lib/kanban/projects-store'
+import { generateId } from '@/lib/id'
 import { loadTickets, type KanbanStore } from '@/lib/kanban/store'
 import { ProjectCard } from '@/components/projects/ProjectCard'
 import { CreateProjectModal } from '@/components/projects/CreateProjectModal'
@@ -83,7 +84,14 @@ export default function ProjectsPage() {
     priority: Project['priority']
     agentId: string | null
   }) {
-    persistProjects((prev) => createProject(prev, data))
+    const id = generateId()
+    const now = Date.now()
+    const project: Project = { ...data, id, createdAt: now, updatedAt: now }
+    persistProjects((prev) => ({ ...prev, [id]: project }))
+  }
+
+  function handleDeleteProject(id: string) {
+    persistProjects((prev) => deleteProject(prev, id))
   }
 
   function getTicketCount(projectId: string): number {
@@ -200,6 +208,7 @@ export default function ProjectsPage() {
                 agent={agent}
                 ticketCount={getTicketCount(project.id)}
                 onClick={() => router.push(`/kanban?project=${project.id}`)}
+                onDelete={handleDeleteProject}
               />
             )
           })}
