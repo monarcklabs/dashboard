@@ -1,234 +1,129 @@
 /**
- * Server-side workspace document scanner.
- * Discovers document files in the OpenClaw workspace for the Docs browser.
- * Follows the lib/memory.ts pattern: requireEnv() inside functions, fs sync ops.
+ * Docs browser data source.
+ * Aggregates client-facing documents from two sources:
+ *   1. Kanban tickets with completed work results (agent deliverables)
+ *   2. Cron runs with summary output (scheduled reports)
  */
 
-import type { DocFileInfo, DocFileType, DocCategory } from '@/lib/types'
-import { readFileSync, existsSync, statSync, readdirSync } from 'fs'
-import { join, extname, relative, resolve } from 'path'
-import { requireEnv } from '@/lib/env'
+import type { DocEntry, CronRun } from '@/lib/types'
+import type { KanbanTicket } from '@/lib/kanban/types'
+import { getKanbanStore } from '@/lib/kanban/server-store'
+import { getCronRuns } from '@/lib/cron-runs'
 
-// ── Constants ────────────────────────────────────────────────────
+// ── Kanban ticket documents ──────────────────────────────────
 
-const MAX_DEPTH = 5
-const MAX_FILES = 500
-
-/** File extensions we scan for */
-const DOC_EXTENSIONS = new Set(['.md', '.html', '.json', '.csv', '.txt', '.pdf', '.xlsx'])
-
-/** Directories to skip entirely */
-const SKIP_DIRS = new Set(['node_modules', '.git', '.openclaw', 'memory', '.DS_Store'])
-
-/** Files to skip (owned by other features) */
-const SKIP_FILES = new Set(['SOUL.md', 'MEMORY.md', 'openclaw.json'])
-
-// ── Helpers ──────────────────────────────────────────────────────
-
-function extToFileType(ext: string): DocFileType {
-  const map: Record<string, DocFileType> = {
-    '.md': 'md',
-    '.html': 'html',
-    '.json': 'json',
-    '.csv': 'csv',
-    '.txt': 'txt',
-    '.pdf': 'pdf',
-    '.xlsx': 'xlsx',
-  }
-  return map[ext] ?? 'unknown'
+/** Tickets that have work output worth showing in the docs browser */
+function isDocWorthy(ticket: KanbanTicket): boolean {
+  if (!ticket.workResult) return false
+  if (ticket.workState !== 'done') return false
+  // Only show tickets in review or done status (completed work)
+  return ticket.status === 'review' || ticket.status === 'done'
 }
 
-function deriveCategory(relativePath: string): DocCategory {
-  const parts = relativePath.split('/')
-  if (parts.length === 1) return 'root'
-  if (parts[0] === 'agents') return 'agent'
-  if (parts.includes('docs')) return 'docs'
-  if (parts.includes('output')) return 'output'
-  return 'other'
-}
-
-function extractAgentId(relativePath: string): string | null {
-  const match = relativePath.match(/^agents\/([^/]+)\//)
-  return match ? match[1] : null
-}
-
-function buildTags(fileType: DocFileType, category: DocCategory, agentId: string | null): string[] {
-  const tags: string[] = [fileType, category]
-  if (agentId) tags.push(agentId)
-  return tags
-}
-
-// ── Recursive scanner ────────────────────────────────────────────
-
-function scanDir(
-  dir: string,
-  workspacePath: string,
-  files: DocFileInfo[],
-  depth: number
-): void {
-  if (depth > MAX_DEPTH || files.length >= MAX_FILES) return
-
-  let entries: string[]
-  try {
-    entries = readdirSync(dir)
-  } catch {
-    return
-  }
-
-  for (const entry of entries) {
-    if (files.length >= MAX_FILES) return
-
-    const fullPath = join(dir, entry)
-    const relPath = relative(workspacePath, fullPath)
-
-    // Skip hidden entries (except we already checked SKIP_DIRS)
-    if (entry.startsWith('.') && !SKIP_DIRS.has(entry)) continue
-    if (SKIP_DIRS.has(entry)) continue
-    if (SKIP_FILES.has(entry)) continue
-
-    let stat
-    try {
-      stat = statSync(fullPath)
-    } catch {
-      continue
-    }
-
-    if (stat.isDirectory()) {
-      // Also skip agent SOUL.md directories that only contain SOUL.md
-      scanDir(fullPath, workspacePath, files, depth + 1)
-      continue
-    }
-
-    if (!stat.isFile()) continue
-
-    const ext = extname(entry).toLowerCase()
-    if (!DOC_EXTENSIONS.has(ext)) continue
-
-    const fileType = extToFileType(ext)
-    const category = deriveCategory(relPath)
-    const agentId = extractAgentId(relPath)
-
-    files.push({
-      name: entry,
-      relativePath: relPath,
-      fileType,
-      category,
-      agentId,
-      tags: buildTags(fileType, category, agentId),
-      sizeBytes: stat.size,
-      lastModified: stat.mtime.toISOString(),
-    })
-  }
-}
-
-// ── Public API ───────────────────────────────────────────────────
-
-/**
- * Discovers document files in the workspace.
- * Returns metadata only (no content) for fast listing.
- */
-export function getDocFiles(): DocFileInfo[] {
-  const workspacePath = requireEnv('WORKSPACE_PATH')
-  if (!existsSync(workspacePath)) return []
-
-  const files: DocFileInfo[] = []
-  scanDir(workspacePath, workspacePath, files, 0)
-
-  // Sort by lastModified descending (most recent first)
-  files.sort((a, b) =>
-    new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
-  )
-
-  return files
-}
-
-/**
- * Reads a single document file's content.
- * Returns null if not found. Throws on path traversal attempts.
- */
-export function getDocContent(relativePath: string): { file: DocFileInfo; content: string } | null {
-  if (relativePath.includes('..')) {
-    throw new PathTraversalError('Path traversal not allowed')
-  }
-
-  const workspacePath = requireEnv('WORKSPACE_PATH')
-  const fullPath = join(workspacePath, relativePath)
-
-  // Ensure resolved path is still within workspace
-  const resolved = resolve(fullPath)
-  const resolvedWorkspace = resolve(workspacePath)
-  if (!resolved.startsWith(resolvedWorkspace + '/') && resolved !== resolvedWorkspace) {
-    throw new PathTraversalError('Path traversal not allowed')
-  }
-
-  if (!existsSync(fullPath)) return null
-
-  let stat
-  try {
-    stat = statSync(fullPath)
-  } catch {
-    return null
-  }
-  if (!stat.isFile()) return null
-
-  const name = fullPath.split('/').pop() ?? relativePath
-  const ext = extname(name).toLowerCase()
-  const fileType = extToFileType(ext)
-  const category = deriveCategory(relativePath)
-  const agentId = extractAgentId(relativePath)
-
-  // For binary files, return empty content
-  const isBinary = fileType === 'pdf' || fileType === 'xlsx'
-  let content = ''
-  if (!isBinary) {
-    try {
-      content = readFileSync(fullPath, 'utf-8')
-    } catch {
-      return null
-    }
-  }
+function ticketToDoc(ticket: KanbanTicket): DocEntry {
+  const tags: string[] = ['kanban']
+  if (ticket.status) tags.push(ticket.status)
+  if (ticket.assigneeId) tags.push(ticket.assigneeId)
 
   return {
-    file: {
-      name,
-      relativePath,
-      fileType,
-      category,
-      agentId,
-      tags: buildTags(fileType, category, agentId),
-      sizeBytes: stat.size,
-      lastModified: stat.mtime.toISOString(),
-    },
-    content,
+    id: `kanban-${ticket.id}`,
+    title: ticket.title,
+    source: 'kanban',
+    content: ticket.workResult!,
+    agentId: ticket.assigneeId,
+    date: new Date(ticket.updatedAt).toISOString(),
+    tags,
+    ticketStatus: ticket.status,
+    projectId: ticket.projectId,
+    jobId: null,
+    cronStatus: null,
+    deliveryStatus: null,
   }
+}
+
+// ── Cron run documents ───────────────────────────────────────
+
+/** Cron runs that produced meaningful output */
+function isCronDocWorthy(run: CronRun): boolean {
+  if (!run.summary) return false
+  if (run.status !== 'ok') return false
+  // Require some meaningful content (not just a one-liner status)
+  return run.summary.length > 100
+}
+
+function cronRunToDoc(run: CronRun): DocEntry {
+  const tags: string[] = ['cron']
+  if (run.deliveryStatus) tags.push(run.deliveryStatus)
+
+  // Derive a readable name from jobId
+  // e.g. "a1b2c3d4-life-os-morning-report-001" → "Morning Report"
+  const namePart = run.jobId
+    .replace(/^[a-f0-9]+-/, '')     // strip UUID prefix
+    .replace(/-\d+$/, '')            // strip trailing number
+    .replace(/^life-os-/, '')        // strip common prefix
+    .split('-')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+
+  return {
+    id: `cron-${run.jobId}-${run.ts}`,
+    title: namePart || run.jobId,
+    source: 'cron',
+    content: run.summary!,
+    agentId: null,
+    date: new Date(run.ts).toISOString(),
+    tags,
+    ticketStatus: null,
+    projectId: null,
+    jobId: run.jobId,
+    cronStatus: run.status,
+    deliveryStatus: run.deliveryStatus,
+  }
+}
+
+// ── Public API ───────────────────────────────────────────────
+
+/**
+ * Returns all document entries from kanban tickets and cron runs,
+ * sorted by date descending (most recent first).
+ */
+export function getDocEntries(): DocEntry[] {
+  const docs: DocEntry[] = []
+
+  // 1. Kanban tickets with work results
+  try {
+    const store = getKanbanStore()
+    for (const ticket of Object.values(store)) {
+      if (isDocWorthy(ticket)) {
+        docs.push(ticketToDoc(ticket))
+      }
+    }
+  } catch {
+    // Kanban store unavailable -- continue with cron data
+  }
+
+  // 2. Cron runs with summaries
+  try {
+    const runs = getCronRuns()
+    for (const run of runs) {
+      if (isCronDocWorthy(run)) {
+        docs.push(cronRunToDoc(run))
+      }
+    }
+  } catch {
+    // Cron runs unavailable -- continue with what we have
+  }
+
+  // Sort by date descending
+  docs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+  return docs
 }
 
 /**
- * Returns the absolute path for a document (for binary file streaming).
+ * Returns a single document entry by ID.
  */
-export function getDocAbsolutePath(relativePath: string): string | null {
-  if (relativePath.includes('..')) {
-    throw new PathTraversalError('Path traversal not allowed')
-  }
-
-  const workspacePath = requireEnv('WORKSPACE_PATH')
-  const fullPath = join(workspacePath, relativePath)
-
-  const resolved = resolve(fullPath)
-  const resolvedWorkspace = resolve(workspacePath)
-  if (!resolved.startsWith(resolvedWorkspace + '/') && resolved !== resolvedWorkspace) {
-    throw new PathTraversalError('Path traversal not allowed')
-  }
-
-  if (!existsSync(fullPath)) return null
-  return fullPath
-}
-
-// ── Error types ──────────────────────────────────────────────────
-
-export class PathTraversalError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'PathTraversalError'
-  }
+export function getDocEntry(id: string): DocEntry | null {
+  const docs = getDocEntries()
+  return docs.find(d => d.id === id) ?? null
 }

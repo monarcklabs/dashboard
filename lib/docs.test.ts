@@ -1,223 +1,177 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { KanbanTicket } from './kanban/types'
+import type { CronRun } from '@/lib/types'
 
-const {
-  mockExistsSync,
-  mockStatSync,
-  mockReaddirSync,
-  mockReadFileSync,
-  mockRequireEnv,
-} = vi.hoisted(() => ({
-  mockExistsSync: vi.fn(),
-  mockStatSync: vi.fn(),
-  mockReaddirSync: vi.fn(),
-  mockReadFileSync: vi.fn(),
-  mockRequireEnv: vi.fn(),
+const { mockGetKanbanStore, mockGetCronRuns } = vi.hoisted(() => ({
+  mockGetKanbanStore: vi.fn(),
+  mockGetCronRuns: vi.fn(),
 }))
 
-vi.mock('fs', () => ({
-  existsSync: mockExistsSync,
-  statSync: mockStatSync,
-  readdirSync: mockReaddirSync,
-  readFileSync: mockReadFileSync,
-  default: {
-    existsSync: mockExistsSync,
-    statSync: mockStatSync,
-    readdirSync: mockReaddirSync,
-    readFileSync: mockReadFileSync,
-  },
+vi.mock('@/lib/kanban/server-store', () => ({
+  getKanbanStore: mockGetKanbanStore,
 }))
 
-vi.mock('@/lib/env', () => ({
-  requireEnv: mockRequireEnv,
+vi.mock('@/lib/cron-runs', () => ({
+  getCronRuns: mockGetCronRuns,
 }))
 
-import { getDocFiles, getDocContent, PathTraversalError } from './docs'
+import { getDocEntries, getDocEntry } from './docs'
 
-function makeStat(opts: { isFile?: boolean; isDir?: boolean; size?: number; mtime?: Date }) {
+function makeTicket(overrides: Partial<KanbanTicket> = {}): KanbanTicket {
   return {
-    isFile: () => opts.isFile ?? true,
-    isDirectory: () => opts.isDir ?? false,
-    size: opts.size ?? 100,
-    mtime: opts.mtime ?? new Date('2025-01-15T10:00:00Z'),
+    id: 'ticket-1',
+    title: 'Write quarterly report',
+    description: 'A detailed report',
+    useSessionMemory: false,
+    relevantFiles: [],
+    status: 'done',
+    priority: 'medium',
+    assigneeId: 'vera',
+    assigneeRole: null,
+    projectId: null,
+    workState: 'done',
+    workStartedAt: Date.now() - 60000,
+    workError: null,
+    workResult: '# Quarterly Report\n\nHere are the results...',
+    createdAt: Date.now() - 120000,
+    updatedAt: Date.now(),
+    ...overrides,
+  }
+}
+
+function makeCronRun(overrides: Partial<CronRun> = {}): CronRun {
+  return {
+    ts: Date.now(),
+    jobId: 'abc123-morning-report-001',
+    status: 'ok',
+    summary: '# Morning Report\n\n' + 'This is a detailed report with enough content to pass the length threshold. '.repeat(3),
+    error: null,
+    durationMs: 5000,
+    deliveryStatus: 'delivered',
+    model: 'claude-sonnet-4-6',
+    provider: 'anthropic',
+    usage: { input_tokens: 1000, output_tokens: 500, total_tokens: 1500 },
+    ...overrides,
   }
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockRequireEnv.mockReturnValue('/workspace')
+  mockGetKanbanStore.mockReturnValue({})
+  mockGetCronRuns.mockReturnValue([])
 })
 
-describe('getDocFiles', () => {
-  it('returns empty array when workspace does not exist', () => {
-    mockExistsSync.mockReturnValue(false)
-    expect(getDocFiles()).toEqual([])
+describe('getDocEntries', () => {
+  it('returns empty array when no data', () => {
+    expect(getDocEntries()).toEqual([])
   })
 
-  it('discovers .md files at workspace root', () => {
-    mockExistsSync.mockReturnValue(true)
-    mockReaddirSync.mockReturnValue(['report.md', 'notes.txt'])
-    mockStatSync.mockReturnValue(makeStat({ isFile: true, size: 500 }))
+  it('includes completed kanban tickets with work results', () => {
+    mockGetKanbanStore.mockReturnValue({
+      'ticket-1': makeTicket(),
+    })
 
-    const files = getDocFiles()
-    expect(files).toHaveLength(2)
-    expect(files[0].name).toBe('report.md')
-    expect(files[0].fileType).toBe('md')
-    expect(files[0].category).toBe('root')
-    expect(files[1].name).toBe('notes.txt')
-    expect(files[1].fileType).toBe('txt')
+    const docs = getDocEntries()
+    expect(docs).toHaveLength(1)
+    expect(docs[0].source).toBe('kanban')
+    expect(docs[0].title).toBe('Write quarterly report')
+    expect(docs[0].content).toContain('Quarterly Report')
+    expect(docs[0].agentId).toBe('vera')
+    expect(docs[0].id).toBe('kanban-ticket-1')
   })
 
-  it('skips SOUL.md and MEMORY.md', () => {
-    mockExistsSync.mockReturnValue(true)
-    mockReaddirSync.mockReturnValue(['SOUL.md', 'MEMORY.md', 'report.md'])
-    mockStatSync.mockReturnValue(makeStat({ isFile: true }))
-
-    const files = getDocFiles()
-    expect(files).toHaveLength(1)
-    expect(files[0].name).toBe('report.md')
+  it('excludes tickets without work results', () => {
+    mockGetKanbanStore.mockReturnValue({
+      'ticket-1': makeTicket({ workResult: null }),
+    })
+    expect(getDocEntries()).toHaveLength(0)
   })
 
-  it('skips node_modules, .git, and memory directories', () => {
-    mockExistsSync.mockReturnValue(true)
-    mockReaddirSync.mockImplementation((dir: string) => {
-      if (dir === '/workspace') return ['node_modules', '.git', 'memory', 'doc.md']
-      return []
+  it('excludes tickets still in progress', () => {
+    mockGetKanbanStore.mockReturnValue({
+      'ticket-1': makeTicket({ status: 'in-progress', workState: 'working' }),
     })
-    mockStatSync.mockImplementation((path: string) => {
-      if (path.endsWith('doc.md')) return makeStat({ isFile: true })
-      return makeStat({ isDir: true })
-    })
-
-    const files = getDocFiles()
-    expect(files).toHaveLength(1)
-    expect(files[0].name).toBe('doc.md')
+    expect(getDocEntries()).toHaveLength(0)
   })
 
-  it('categorizes files in agents/ subdirectories', () => {
-    mockExistsSync.mockReturnValue(true)
-    mockReaddirSync.mockImplementation((dir: string) => {
-      if (dir === '/workspace') return ['agents']
-      if (dir === '/workspace/agents') return ['vera']
-      if (dir === '/workspace/agents/vera') return ['report.md', 'SOUL.md']
-      return []
+  it('includes tickets in review status', () => {
+    mockGetKanbanStore.mockReturnValue({
+      'ticket-1': makeTicket({ status: 'review' }),
     })
-    mockStatSync.mockImplementation((path: string) => {
-      if (path.endsWith('.md')) return makeStat({ isFile: true })
-      return makeStat({ isDir: true })
-    })
-
-    const files = getDocFiles()
-    expect(files).toHaveLength(1)
-    expect(files[0].name).toBe('report.md')
-    expect(files[0].category).toBe('agent')
-    expect(files[0].agentId).toBe('vera')
-    expect(files[0].tags).toContain('vera')
-    expect(files[0].relativePath).toBe('agents/vera/report.md')
+    expect(getDocEntries()).toHaveLength(1)
   })
 
-  it('categorizes files in docs/ subdirectories', () => {
-    mockExistsSync.mockReturnValue(true)
-    mockReaddirSync.mockImplementation((dir: string) => {
-      if (dir === '/workspace') return ['docs']
-      if (dir === '/workspace/docs') return ['guide.md']
-      return []
-    })
-    mockStatSync.mockImplementation((path: string) => {
-      if (path.endsWith('.md')) return makeStat({ isFile: true })
-      return makeStat({ isDir: true })
-    })
+  it('includes cron runs with summaries', () => {
+    mockGetCronRuns.mockReturnValue([makeCronRun()])
 
-    const files = getDocFiles()
-    expect(files).toHaveLength(1)
-    expect(files[0].category).toBe('docs')
+    const docs = getDocEntries()
+    expect(docs).toHaveLength(1)
+    expect(docs[0].source).toBe('cron')
+    expect(docs[0].title).toBe('Morning Report')
+    expect(docs[0].content).toContain('Morning Report')
+    expect(docs[0].jobId).toBe('abc123-morning-report-001')
   })
 
-  it('categorizes files in output/ subdirectories', () => {
-    mockExistsSync.mockReturnValue(true)
-    mockReaddirSync.mockImplementation((dir: string) => {
-      if (dir === '/workspace') return ['output']
-      if (dir === '/workspace/output') return ['data.csv']
-      return []
-    })
-    mockStatSync.mockImplementation((path: string) => {
-      if (path.endsWith('.csv')) return makeStat({ isFile: true })
-      return makeStat({ isDir: true })
-    })
-
-    const files = getDocFiles()
-    expect(files).toHaveLength(1)
-    expect(files[0].category).toBe('output')
-    expect(files[0].fileType).toBe('csv')
+  it('excludes cron runs without summaries', () => {
+    mockGetCronRuns.mockReturnValue([makeCronRun({ summary: null })])
+    expect(getDocEntries()).toHaveLength(0)
   })
 
-  it('sorts by lastModified descending', () => {
-    mockExistsSync.mockReturnValue(true)
-    mockReaddirSync.mockReturnValue(['old.md', 'new.md'])
-    mockStatSync.mockImplementation((path: string) => {
-      if ((path as string).endsWith('old.md')) return makeStat({ isFile: true, mtime: new Date('2024-01-01') })
-      return makeStat({ isFile: true, mtime: new Date('2025-06-01') })
-    })
-
-    const files = getDocFiles()
-    expect(files[0].name).toBe('new.md')
-    expect(files[1].name).toBe('old.md')
+  it('excludes cron runs with error status', () => {
+    mockGetCronRuns.mockReturnValue([makeCronRun({ status: 'error' })])
+    expect(getDocEntries()).toHaveLength(0)
   })
 
-  it('generates correct tags', () => {
-    mockExistsSync.mockReturnValue(true)
-    mockReaddirSync.mockReturnValue(['data.json'])
-    mockStatSync.mockReturnValue(makeStat({ isFile: true }))
-
-    const files = getDocFiles()
-    expect(files[0].tags).toEqual(['json', 'root'])
+  it('excludes cron runs with very short summaries', () => {
+    mockGetCronRuns.mockReturnValue([makeCronRun({ summary: 'Done.' })])
+    expect(getDocEntries()).toHaveLength(0)
   })
 
-  it('handles unreadable directories gracefully', () => {
-    mockExistsSync.mockReturnValue(true)
-    mockReaddirSync.mockImplementation(() => {
-      throw new Error('EACCES: permission denied')
-    })
+  it('combines kanban and cron sources sorted by date', () => {
+    const older = Date.now() - 86400000
+    const newer = Date.now()
 
-    const files = getDocFiles()
-    expect(files).toEqual([])
+    mockGetKanbanStore.mockReturnValue({
+      'ticket-1': makeTicket({ updatedAt: older }),
+    })
+    mockGetCronRuns.mockReturnValue([makeCronRun({ ts: newer })])
+
+    const docs = getDocEntries()
+    expect(docs).toHaveLength(2)
+    expect(docs[0].source).toBe('cron')  // newer
+    expect(docs[1].source).toBe('kanban') // older
+  })
+
+  it('handles kanban store errors gracefully', () => {
+    mockGetKanbanStore.mockImplementation(() => { throw new Error('store error') })
+    mockGetCronRuns.mockReturnValue([makeCronRun()])
+
+    const docs = getDocEntries()
+    expect(docs).toHaveLength(1)
+    expect(docs[0].source).toBe('cron')
+  })
+
+  it('handles cron runs errors gracefully', () => {
+    mockGetKanbanStore.mockReturnValue({ 'ticket-1': makeTicket() })
+    mockGetCronRuns.mockImplementation(() => { throw new Error('cron error') })
+
+    const docs = getDocEntries()
+    expect(docs).toHaveLength(1)
+    expect(docs[0].source).toBe('kanban')
   })
 })
 
-describe('getDocContent', () => {
-  it('reads text file content', () => {
-    mockExistsSync.mockReturnValue(true)
-    mockStatSync.mockReturnValue(makeStat({ isFile: true, size: 42 }))
-    mockReadFileSync.mockReturnValue('# Hello World')
+describe('getDocEntry', () => {
+  it('returns a specific document by id', () => {
+    mockGetKanbanStore.mockReturnValue({ 'ticket-1': makeTicket() })
 
-    const result = getDocContent('report.md')
-    expect(result).not.toBeNull()
-    expect(result!.content).toBe('# Hello World')
-    expect(result!.file.name).toBe('report.md')
-    expect(result!.file.fileType).toBe('md')
+    const doc = getDocEntry('kanban-ticket-1')
+    expect(doc).not.toBeNull()
+    expect(doc!.title).toBe('Write quarterly report')
   })
 
-  it('returns empty content for binary files', () => {
-    mockExistsSync.mockReturnValue(true)
-    mockStatSync.mockReturnValue(makeStat({ isFile: true }))
-
-    const result = getDocContent('report.pdf')
-    expect(result).not.toBeNull()
-    expect(result!.content).toBe('')
-    expect(result!.file.fileType).toBe('pdf')
-  })
-
-  it('returns null for non-existent files', () => {
-    mockExistsSync.mockReturnValue(false)
-    expect(getDocContent('missing.md')).toBeNull()
-  })
-
-  it('throws PathTraversalError for .. in path', () => {
-    expect(() => getDocContent('../etc/passwd')).toThrow(PathTraversalError)
-  })
-
-  it('throws PathTraversalError for paths escaping workspace', () => {
-    mockExistsSync.mockReturnValue(true)
-    expect(() => getDocContent('foo/../../etc/passwd')).toThrow(PathTraversalError)
+  it('returns null for unknown id', () => {
+    expect(getDocEntry('nonexistent')).toBeNull()
   })
 })

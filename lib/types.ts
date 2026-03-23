@@ -358,17 +358,21 @@ export interface LiveLogLine {
 
 // ── Docs Browser Types ─────────────────────────────────────
 
-export type DocFileType = 'md' | 'html' | 'json' | 'csv' | 'txt' | 'pdf' | 'xlsx' | 'unknown'
+export type DocSource = 'kanban' | 'cron'
 
-export type DocCategory = 'root' | 'agent' | 'docs' | 'output' | 'other'
-
-export interface DocFileInfo {
-  name: string             // filename, e.g. "report.md"
-  relativePath: string     // relative to workspace, e.g. "agents/vera/output/report.md"
-  fileType: DocFileType
-  category: DocCategory
-  agentId: string | null   // populated if file is inside an agent subdirectory
-  tags: string[]           // auto-generated tags: [fileType, category, agentId?]
-  sizeBytes: number
-  lastModified: string     // ISO 8601
+export interface DocEntry {
+  id: string               // unique identifier (ticketId or cronRun key)
+  title: string            // ticket title or cron job name
+  source: DocSource
+  content: string          // markdown content (workResult or cron summary)
+  agentId: string | null   // assigned agent
+  date: string             // ISO 8601 timestamp
+  tags: string[]           // auto-generated: [source, status, agentId?]
+  // kanban-specific
+  ticketStatus: string | null      // 'review' | 'done' etc.
+  projectId: string | null
+  // cron-specific
+  jobId: string | null
+  cronStatus: string | null        // 'ok' | 'error'
+  deliveryStatus: string | null
 }

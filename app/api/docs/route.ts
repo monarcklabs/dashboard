@@ -1,12 +1,12 @@
-import { getDocFiles } from '@/lib/docs'
+import { getDocEntries } from '@/lib/docs'
 import { apiErrorResponse } from '@/lib/api-error'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
   try {
-    const files = getDocFiles()
-    return NextResponse.json({ files })
+    const docs = getDocEntries()
+    return NextResponse.json({ docs })
   } catch (err) {
-    return apiErrorResponse(err, 'Failed to load document files')
+    return apiErrorResponse(err, 'Failed to load documents')
   }
 }
