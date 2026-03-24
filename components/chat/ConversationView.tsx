@@ -243,12 +243,51 @@ export function ConversationView({ agent, conversation, onUpdate, onBack }: Conv
         }),
       })
 
-      if (!res.ok || !res.body) throw new Error('Stream failed')
+      if (!res.ok) {
+        let detail = `HTTP ${res.status}`
+        try {
+          const errorData = await res.json()
+          if (errorData && typeof errorData.error === 'string' && errorData.error.trim()) {
+            detail = errorData.error.trim()
+          }
+        } catch {
+          try {
+            const text = await res.text()
+            if (text.trim()) detail = text.trim()
+          } catch {
+            // Ignore body parsing failures and keep the HTTP status detail.
+          }
+        }
+        throw new Error(detail)
+      }
+
+      if (!res.body) {
+        throw new Error('Empty response body')
+      }
 
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
       let fullContent = ''
+
+      const applySseLine = (line: string) => {
+        if (!line.startsWith('data: ') || line === 'data: [DONE]') return
+        try {
+          const chunk = JSON.parse(line.slice(6))
+          if (chunk.error) {
+            throw new Error(String(chunk.error))
+          }
+          if (chunk.content) {
+            fullContent += chunk.content
+            const capturedContent = fullContent
+            onUpdate(agent.id, prev => updateLastMessage(prev, agent.id, assistantMsgId, capturedContent, true))
+          }
+        } catch (err) {
+          if (err instanceof Error && err.message) {
+            throw err
+          }
+        }
+      }
 
       while (true) {
         const { done, value } = await reader.read()
@@ -256,29 +295,30 @@ export function ConversationView({ agent, conversation, onUpdate, onBack }: Conv
         buffer += decoder.decode(value, { stream: true })
         const lines = buffer.split('\n')
         buffer = lines.pop() || ''
-        for (const line of lines) {
-          if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-            try {
-              const chunk = JSON.parse(line.slice(6))
-              if (chunk.content) {
-                fullContent += chunk.content
-                const capturedContent = fullContent
-                onUpdate(agent.id, prev => updateLastMessage(prev, agent.id, assistantMsgId, capturedContent, true))
-              }
-            } catch { /* skip malformed chunks */ }
-          }
-        }
+        for (const line of lines) applySseLine(line)
+      }
+
+      buffer += decoder.decode()
+      if (buffer) {
+        for (const line of buffer.split('\n')) applySseLine(line)
+      }
+
+      if (!fullContent.trim()) {
+        throw new Error('Empty response from agent')
       }
 
       const finalContent = fullContent
       onUpdate(agent.id, prev => updateLastMessage(prev, agent.id, assistantMsgId, finalContent, false))
-    } catch {
-      onUpdate(agent.id, prev => updateLastMessage(prev, agent.id, assistantMsgId, 'Error getting response. Check API connection.', false))
+    } catch (err) {
+      const errorContent = err instanceof Error && err.message
+        ? `Error getting response: ${err.message}`
+        : 'Error getting response. Check API connection.'
+      onUpdate(agent.id, prev => updateLastMessage(prev, agent.id, assistantMsgId, errorContent, false))
     } finally {
       setIsStreaming(false)
       textareaRef.current?.focus()
     }
-  }, [input, pendingAttachments, isStreaming, agent.id, onUpdate])
+  }, [input, pendingAttachments, isStreaming, agent.id, onUpdate, settings.operatorName, settings.missionStatement])
 
   function runSlashCommand(command: string) {
     const result = executeCommand(command, agent)
