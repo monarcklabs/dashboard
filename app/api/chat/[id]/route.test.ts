@@ -99,6 +99,20 @@ describe('POST /api/chat/[id]', () => {
     expect(mocks.sendViaOpenClaw.mock.calls[0][0].sessionKey).toMatch(/^chat:ecommerce-lead:/)
   })
 
+  it('still attempts async fallback when the gateway token is not configured', async () => {
+    vi.unstubAllEnvs()
+    mocks.createCompletion.mockRejectedValue(new Error('Gateway call failed: Error: gateway timeout after 10000ms'))
+
+    const response = await POST(makeRequest(), {
+      params: Promise.resolve({ id: 'ecommerce-lead' }),
+    })
+
+    expect(response.status).toBe(200)
+    await expect(readResponseText(response)).resolves.toContain('Top seller appears to be the black hoodie.')
+    expect(mocks.sendViaOpenClaw).toHaveBeenCalledOnce()
+    expect(mocks.sendViaOpenClaw.mock.calls[0][0].gatewayToken).toBe('')
+  })
+
   it('sends an SSE error event instead of ending with an empty reply when the stream fails', async () => {
     const failingStream = {
       async *[Symbol.asyncIterator]() {

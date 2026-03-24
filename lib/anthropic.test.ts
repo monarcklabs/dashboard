@@ -386,6 +386,44 @@ describe('sendViaOpenClaw', () => {
     expect(paramsJson.attachments[0].mimeType).toBe('image/jpeg')
   })
 
+  it('omits the token flag when no gateway token is configured', async () => {
+    vi.mocked(mockExecFile).mockImplementation((_cmd, args, _opts, cb) => {
+      const argsArr = args as string[]
+      if (argsArr.includes('chat.send')) {
+        (cb as (err: Error | null, stdout: string, stderr: string) => void)(
+          null,
+          JSON.stringify({ runId: 'r1', status: 'started' }),
+          ''
+        )
+      } else {
+        (cb as (err: Error | null, stdout: string, stderr: string) => void)(
+          null,
+          JSON.stringify({
+            messages: [{
+              role: 'assistant',
+              content: [{ type: 'text', text: 'ok' }],
+              timestamp: Date.now(),
+            }],
+          }),
+          ''
+        )
+      }
+      return {} as ReturnType<typeof mockExecFile>
+    })
+
+    await sendViaOpenClaw({
+      message: 'describe this',
+      attachments: [],
+    })
+
+    const sendCall = vi.mocked(mockExecFile).mock.calls.find(
+      c => (c[1] as string[]).includes('chat.send')
+    )
+    expect(sendCall).toBeTruthy()
+    const [, args] = sendCall!
+    expect(args).not.toContain('--token')
+  })
+
   it('handles string content in assistant response', async () => {
     vi.mocked(mockExecFile).mockImplementation((_cmd, args, _opts, cb) => {
       const argsArr = args as string[]

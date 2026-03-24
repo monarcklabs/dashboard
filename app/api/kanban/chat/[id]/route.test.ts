@@ -127,6 +127,20 @@ describe('POST /api/kanban/chat/[id]', () => {
     expect(mocks.sendViaOpenClaw.mock.calls[0][0].sessionKey).toMatch(/^kanban:legal:/)
   })
 
+  it('still attempts async fallback when the gateway token is not configured', async () => {
+    vi.unstubAllEnvs()
+    mocks.createCompletion.mockRejectedValue(new Error('Gateway call failed: Error: gateway timeout after 10000ms'))
+
+    const response = await POST(makeRequest([{ role: 'user', content: 'Please continue.' }]), {
+      params: Promise.resolve({ id: 'legal' }),
+    })
+
+    expect(response.status).toBe(200)
+    await expect(readResponseText(response)).resolves.toContain('Recovered through async fallback.')
+    expect(mocks.sendViaOpenClaw).toHaveBeenCalledOnce()
+    expect(mocks.sendViaOpenClaw.mock.calls[0][0].gatewayToken).toBe('')
+  })
+
   it('falls back when the stream errors before any content is emitted', async () => {
     const failingStream = {
       async *[Symbol.asyncIterator]() {

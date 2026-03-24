@@ -82,9 +82,6 @@ async function tryAsyncGatewayFallback(
   messages: OpenAI.ChatCompletionMessageParam[],
   signal: AbortSignal,
 ): Promise<string | null> {
-  const token = gatewayToken()
-  if (!token) return null
-
   const textMessages = messages
     .filter((message) => message.role === 'user' || message.role === 'assistant')
     .map((message) => ({
@@ -93,7 +90,7 @@ async function tryAsyncGatewayFallback(
     }))
 
   return sendViaOpenClaw({
-    gatewayToken: token,
+    gatewayToken: gatewayToken(),
     message: buildTextPrompt(systemPrompt, textMessages),
     attachments: [],
     sessionKey: buildFallbackSessionKey(agentId),

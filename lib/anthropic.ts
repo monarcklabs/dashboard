@@ -123,7 +123,7 @@ export function execCli(
  * Returns the assistant's response text, or null on failure.
  */
 export async function sendViaOpenClaw(opts: {
-  gatewayToken: string
+  gatewayToken?: string
   message: string
   attachments: OpenClawAttachment[]
   sessionKey?: string
@@ -134,7 +134,6 @@ export async function sendViaOpenClaw(opts: {
   const sessionKey = opts.sessionKey || 'agent:main:clawport'
   const idempotencyKey = `clawport-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const timeoutMs = opts.timeoutMs || 60000
-  const token = opts.gatewayToken
 
   // Timestamp before sending — used to identify the new response
   const sendTs = Date.now()
@@ -147,12 +146,16 @@ export async function sendViaOpenClaw(opts: {
     attachments: opts.attachments,
   })
 
-  const sendResult = await execCli(openclawBin, [
+  const sendArgs = [
     'gateway', 'call', 'chat.send',
     '--params', sendParams,
-    '--token', token,
     '--json',
-  ], 15000)
+  ]
+  if (opts.gatewayToken) {
+    sendArgs.splice(sendArgs.length - 1, 0, '--token', opts.gatewayToken)
+  }
+
+  const sendResult = await execCli(openclawBin, sendArgs, 15000)
 
   if (sendResult === null) {
     return null
@@ -183,12 +186,16 @@ export async function sendViaOpenClaw(opts: {
     if (opts.signal?.aborted) return null
     pollIntervalMs = Math.min(pollIntervalMs * 2, MAX_POLL_INTERVAL)
 
-    const historyResult = await execCli(openclawBin, [
+    const historyArgs = [
       'gateway', 'call', 'chat.history',
       '--params', historyParams,
-      '--token', token,
       '--json',
-    ], 10000)
+    ]
+    if (opts.gatewayToken) {
+      historyArgs.splice(historyArgs.length - 1, 0, '--token', opts.gatewayToken)
+    }
+
+    const historyResult = await execCli(openclawBin, historyArgs, 10000)
 
     if (!historyResult) continue
 

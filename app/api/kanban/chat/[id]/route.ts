@@ -87,16 +87,13 @@ async function tryAsyncGatewayFallback(
   messages: { role: 'user' | 'assistant'; content: string }[],
   signal: AbortSignal,
 ): Promise<string | null> {
-  const token = gatewayToken()
-  if (!token) return null
-
   const apiMessages: ApiMessage[] = messages.map((message) => ({
     role: message.role,
     content: message.content,
   }))
 
   return sendViaOpenClaw({
-    gatewayToken: token,
+    gatewayToken: gatewayToken(),
     message: buildTextPrompt(systemPrompt, apiMessages),
     attachments: [],
     sessionKey: buildFallbackSessionKey(agentId),
