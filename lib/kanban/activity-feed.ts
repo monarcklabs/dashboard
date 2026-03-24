@@ -94,14 +94,26 @@ function parseLogContext(message: string): ParsedLogContext {
 }
 
 function shouldIgnoreSubsystemNoise(line: LiveLogLine, subsystem: string | null, message: string): boolean {
-  if (!subsystem) return false
+  // Always surface errors
+  if (line.level === 'error') return false
+
+  // Filter out manifest/plugins noise (OpenAI-compatible provider, dashboard links)
+  if (subsystem === 'plugins') return true
+  if (/^\[plugins\]|\[manifest\]/.test(message)) return true
+
+  // Filter out OTel/metrics noise
+  if (/\bOtlpController\b|\bMetrics: \d+ points\b/i.test(message)) return true
+
+  // Filter out gateway internals not relevant to clients
+  if (/proxy headers detected|cron: armTimer skipped|pricing cache loaded|Refreshing OpenRouter pricing/i.test(message)) return true
+
+  // Filter out debug-level logs
+  if (line.level === 'debug') return true
 
   if (
     subsystem === 'gateway/channels/discord' ||
     subsystem === 'gateway/health-monitor'
   ) {
-    if (line.level === 'error') return false
-
     if (
       /discord startup|deploy-rest:|fetch-bot-|logged in to discord as|message content intent|health-monitor: restarting/i.test(message)
     ) {
