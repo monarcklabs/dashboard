@@ -152,6 +152,16 @@ describe('formatLogMessage', () => {
     })
     expect(result).toBe('Health check passed')
   })
+
+  it('strips subsystem JSON prefixes and humanizes known warnings', () => {
+    const result = formatLogMessage({
+      type: 'log',
+      time: '2026-03-22T12:00:00Z',
+      level: 'warn',
+      message: '{"subsystem":"gateway/ws"} Proxy headers detected from untrusted address. Connection will not be treated as local.',
+    })
+    expect(result).toBe('Gateway saw proxy headers from an untrusted address.')
+  })
 })
 
 describe('logLineToEntry', () => {
@@ -179,6 +189,29 @@ describe('logLineToEntry', () => {
     const entry = logLineToEntry(line, agents, 0)
     expect(entry.agentName).toBe('System')
     expect(entry.agentColor).toBe('#6b7280')
+  })
+
+  it('filters low-signal Discord startup chatter', () => {
+    const line: LiveLogLine = {
+      type: 'log',
+      time: '2026-03-22T12:00:00Z',
+      level: 'info',
+      message: '{"subsystem":"gateway/channels/discord"} discord startup [default] deploy-rest:put:done',
+    }
+    expect(logLineToEntry(line, agents, 0)).toBeNull()
+  })
+
+  it('keeps human-readable system warnings', () => {
+    const line: LiveLogLine = {
+      type: 'log',
+      time: '2026-03-22T12:00:00Z',
+      level: 'warn',
+      message: '{"subsystem":"gateway/ws"} Proxy headers detected from untrusted address. Connection will not be treated as local.',
+    }
+    const entry = logLineToEntry(line, agents, 0)
+    expect(entry).not.toBeNull()
+    expect(entry?.summary).toBe('Gateway saw proxy headers from an untrusted address.')
+    expect(entry?.agentName).toBe('System')
   })
 })
 

@@ -14,6 +14,7 @@ export interface ClawPortSettings {
   iconBgHidden: boolean // hide colored background on sidebar logo
   emojiOnly: boolean // show emoji avatars without colored background
   operatorName: string | null
+  missionStatement: string | null
   agentOverrides: Record<string, AgentOverride>
   liveStreamPosition: { x: number; y: number } | null
   kanbanActivityOpen: boolean
@@ -31,6 +32,7 @@ export const DEFAULTS: ClawPortSettings = {
   iconBgHidden: false,
   emojiOnly: false,
   operatorName: null,
+  missionStatement: null,
   agentOverrides: {},
   liveStreamPosition: null,
   kanbanActivityOpen: false,
@@ -59,6 +61,7 @@ export function loadSettings(): ClawPortSettings {
       iconBgHidden: typeof parsed.iconBgHidden === 'boolean' ? parsed.iconBgHidden : false,
       emojiOnly: typeof parsed.emojiOnly === 'boolean' ? parsed.emojiOnly : false,
       operatorName: typeof parsed.operatorName === 'string' ? parsed.operatorName : null,
+      missionStatement: typeof parsed.missionStatement === 'string' ? parsed.missionStatement : null,
       agentOverrides:
         parsed.agentOverrides && typeof parsed.agentOverrides === 'object'
           ? parsed.agentOverrides

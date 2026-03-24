@@ -122,6 +122,7 @@ export function buildKanbanSystemPrompt(
   agent: Pick<Agent, 'name' | 'title' | 'soul'>,
   ticket: SanitizedKanbanTicketContext | null,
   environment?: AgentEnvironmentContext | null,
+  missionStatement?: string | null,
 ): string {
   const sessionMemoryRules = ticket?.useSessionMemory
     ? 'Session memory is enabled for this ticket. You may use relevant prior hidden session context if it helps continue the work, but restate enough context so the visible reply stands on its own.'
@@ -133,10 +134,11 @@ Description: ${ticket.description || 'No description provided.'}
 Status: ${ticket.status}
 Priority: ${ticket.priority}
 Your role: ${ticket.assigneeRole || 'unassigned'}${buildRelevantFilesBlock(ticket.relevantFiles)}${buildWorkContext(ticket.status, ticket.workResult)}
+${buildMissionBlock(missionStatement)}
 
 Help the user with this ticket. Stay in character as ${agent.name}, ${agent.title}. Be concise - 2-4 sentences unless detail is asked for. No em dashes.
 ${sessionMemoryRules}`
-    : `You are ${agent.name}, ${agent.title}. Respond in character. Be concise. No em dashes.
+    : `You are ${agent.name}, ${agent.title}. Respond in character. Be concise. No em dashes.${buildMissionBlock(missionStatement)}
 Treat each request as scoped only to the messages explicitly provided in this API call. Ignore any hidden or persistent session memory that is not present in those messages.
 If the provided messages do not include a prior assistant reply, do not say "as I said above", "check my previous response", "already covered", or anything similar. Repeat the answer directly instead.`
 
@@ -145,6 +147,11 @@ If the provided messages do not include a prior assistant reply, do not say "as 
   return agent.soul
     ? `${agent.soul}\n\n${ticketContext}${envBlock}`
     : `${ticketContext}${envBlock}`
+}
+
+function buildMissionBlock(missionStatement: string | null | undefined): string {
+  if (!missionStatement) return ''
+  return `\nMission statement: ${missionStatement}\nUse it to align recommendations, priorities, and trade-offs.`
 }
 
 // ~5 k tokens shared across all attached files

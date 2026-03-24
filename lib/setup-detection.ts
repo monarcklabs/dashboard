@@ -21,23 +21,38 @@ import { execSync } from 'child_process'
  * Detect the default workspace path.
  *
  * Checks in order:
- *   1. ~/.openclaw/agents/main/workspace  (current agent-scoped layout)
- *   2. ~/.openclaw/workspace-main         (multi-agent layout, main agent)
- *   3. ~/.openclaw/workspace-*            (multi-agent layout, any agent)
- *   4. ~/.openclaw/workspace              (legacy single-workspace layout)
+ *   1. ~/.openclaw/openclaw.json agents.defaults.workspace (canonical)
+ *   2. ~/.openclaw/agents/main/workspace  (current agent-scoped layout)
+ *   3. ~/.openclaw/workspace-main         (multi-agent layout, main agent)
+ *   4. ~/.openclaw/workspace-*            (multi-agent layout, any agent)
+ *   5. ~/.openclaw/workspace              (legacy single-workspace layout)
  */
 export function detectWorkspacePath(): string | null {
   const base = join(homedir(), '.openclaw')
+  const configPath = join(base, 'openclaw.json')
 
-  // 1. Current agent-scoped layout
+  // 1. Read from openclaw.json (canonical source)
+  if (existsSync(configPath)) {
+    try {
+      const config = JSON.parse(readFileSync(configPath, 'utf-8'))
+      const workspace = config?.agents?.defaults?.workspace
+      if (typeof workspace === 'string' && existsSync(workspace)) {
+        return workspace
+      }
+    } catch {
+      // Invalid JSON, unreadable file, or missing workspace — fall through.
+    }
+  }
+
+  // 2. Current agent-scoped layout
   const agentPath = join(base, 'agents', 'main', 'workspace')
   if (existsSync(agentPath)) return agentPath
 
-  // 2. Multi-agent layout: workspace-main
+  // 3. Multi-agent layout: workspace-main
   const multiMain = join(base, 'workspace-main')
   if (existsSync(multiMain)) return multiMain
 
-  // 3. Multi-agent layout: first workspace-<agentId> found
+  // 4. Multi-agent layout: first workspace-<agentId> found
   try {
     const entries = readdirSync(base)
     const workspaceDirs = entries
@@ -50,7 +65,7 @@ export function detectWorkspacePath(): string | null {
     // ~/.openclaw doesn't exist or isn't readable
   }
 
-  // 4. Legacy single-workspace layout
+  // 5. Legacy single-workspace layout
   const legacyPath = join(base, 'workspace')
   if (existsSync(legacyPath)) return legacyPath
 

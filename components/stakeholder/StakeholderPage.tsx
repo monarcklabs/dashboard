@@ -15,6 +15,7 @@ import type {
   StakeholderRiskItem,
   StakeholderSummary,
 } from '@/lib/stakeholder/types'
+import { useSettings } from '@/app/settings-provider'
 
 const RANGES: StakeholderRange[] = ['24h', '7d', '30d']
 
@@ -113,6 +114,7 @@ export function StakeholderPage({
   summaryPath: string
   exportPath: string
 }) {
+  const { settings, setMissionStatement } = useSettings()
   const [range, setRange] = useState<StakeholderRange>('7d')
   const [summary, setSummary] = useState<StakeholderSummary | null>(null)
   const [loading, setLoading] = useState(true)
@@ -296,6 +298,53 @@ export function StakeholderPage({
 
       <div className="flex-1 overflow-y-auto" style={{ padding: 'var(--space-6)', minHeight: 0 }}>
         <div style={{ display: 'grid', gap: 'var(--space-4)' }}>
+          <section
+            style={{
+              background: 'var(--material-regular)',
+              border: '1px solid var(--separator)',
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--space-4) var(--space-5)',
+            }}
+          >
+            <div style={{ display: 'grid', gap: 'var(--space-2)' }}>
+              <div
+                style={{
+                  fontSize: 'var(--text-footnote)',
+                  fontWeight: 'var(--weight-semibold)',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                Mission statement
+              </div>
+              <div
+                style={{
+                  fontSize: 'var(--text-caption1)',
+                  color: 'var(--text-tertiary)',
+                }}
+              >
+                Give agents a clear north star so their tasks, recommendations, and updates stay aligned with your goals.
+              </div>
+              <textarea
+                value={settings.missionStatement ?? ''}
+                onChange={(e) => setMissionStatement(e.target.value || null)}
+                placeholder="Example: Help us become the most trusted AI-native advisory firm for growth-stage companies."
+                rows={3}
+                style={{
+                  width: '100%',
+                  resize: 'vertical',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--separator)',
+                  background: 'var(--fill-secondary)',
+                  color: 'var(--text-primary)',
+                  padding: '12px 14px',
+                  fontSize: 'var(--text-footnote)',
+                  lineHeight: 1.5,
+                  outline: 'none',
+                }}
+              />
+            </div>
+          </section>
+
           {error && summary && (
             <div
               style={{

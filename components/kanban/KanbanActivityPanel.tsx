@@ -11,9 +11,10 @@ import {
   diffTicketEvents,
   formatRelativeTime,
 } from '@/lib/kanban/activity-feed'
+import { AgentAvatar } from '@/components/AgentAvatar'
 
 const MAX_ENTRIES = 100
-const PANEL_WIDTH = 300
+const PANEL_WIDTH = 320
 
 interface KanbanActivityPanelProps {
   isOpen: boolean
@@ -30,9 +31,8 @@ export function KanbanActivityPanel({
 }: KanbanActivityPanelProps) {
   const [entries, setEntries] = useState<ActivityEntry[]>([])
   const [streaming, setStreaming] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const autoScrollRef = useRef(true)
   const prevTicketsRef = useRef<KanbanStore>(tickets)
   const logIndexRef = useRef(0)
 
@@ -50,12 +50,21 @@ export function KanbanActivityPanel({
     }
   }, [tickets, agents])
 
+  const stopStream = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort()
+      abortRef.current = null
+    }
+    setStreaming(false)
+  }, [])
+
   // SSE stream lifecycle — connect when open, disconnect when closed
   const startStream = useCallback(() => {
     if (abortRef.current) abortRef.current.abort()
     const controller = new AbortController()
     abortRef.current = controller
     setStreaming(true)
+    setError(null)
 
     fetch('/api/logs/stream', { signal: controller.signal })
       .then((res) => {
@@ -74,13 +83,18 @@ export function KanbanActivityPanel({
             const result = parseSSEBuffer(buffer)
             buffer = result.remainder
 
+            if (result.errors.length > 0) {
+              setError(result.errors[0])
+              setStreaming(false)
+              stopStream()
+              return
+            }
+
             if (result.lines.length > 0) {
               const newEntries = result.lines
                 .filter((l: LiveLogLine) => l.type === 'log')
-                .map((l: LiveLogLine, i: number) => {
-                  const entry = logLineToEntry(l, agents, logIndexRef.current + i)
-                  return entry
-                })
+                .map((l: LiveLogLine, i: number) => logLineToEntry(l, agents, logIndexRef.current + i))
+                .filter((entry): entry is ActivityEntry => entry !== null)
               logIndexRef.current += result.lines.length
 
               if (newEntries.length > 0) {
@@ -94,17 +108,10 @@ export function KanbanActivityPanel({
       })
       .catch((err) => {
         if (err instanceof DOMException && err.name === 'AbortError') return
+        setError(err instanceof Error ? err.message : 'Live activity stream failed')
         setStreaming(false)
       })
-  }, [agents])
-
-  const stopStream = useCallback(() => {
-    if (abortRef.current) {
-      abortRef.current.abort()
-      abortRef.current = null
-    }
-    setStreaming(false)
-  }, [])
+  }, [agents, stopStream])
 
   useEffect(() => {
     if (isOpen) {
@@ -115,19 +122,6 @@ export function KanbanActivityPanel({
     return () => stopStream()
   }, [isOpen, startStream, stopStream])
 
-  // Auto-scroll to bottom when new entries arrive
-  useEffect(() => {
-    if (autoScrollRef.current && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-  }, [entries])
-
-  const handleScroll = useCallback(() => {
-    if (!scrollRef.current) return
-    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current
-    autoScrollRef.current = scrollHeight - scrollTop - clientHeight < 40
-  }, [])
-
   // Relative time ticker — update every 30s
   const [, setTick] = useState(0)
   useEffect(() => {
@@ -135,6 +129,8 @@ export function KanbanActivityPanel({
     const timer = setInterval(() => setTick((t) => t + 1), 30_000)
     return () => clearInterval(timer)
   }, [isOpen, entries.length])
+
+  const displayEntries = [...entries].reverse()
 
   return (
     <div
@@ -147,7 +143,7 @@ export function KanbanActivityPanel({
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        background: 'var(--bg)',
+        background: 'linear-gradient(180deg, rgba(10,12,16,0.98) 0%, rgba(8,10,14,0.96) 100%)',
       }}
     >
       {/* Header */}
@@ -160,6 +156,7 @@ export function KanbanActivityPanel({
           justifyContent: 'space-between',
           flexShrink: 0,
           minWidth: PANEL_WIDTH,
+          background: 'rgba(255,255,255,0.015)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -204,16 +201,15 @@ export function KanbanActivityPanel({
 
       {/* Feed */}
       <div
-        ref={scrollRef}
-        onScroll={handleScroll}
         style={{
           flex: 1,
           overflowY: 'auto',
           overflowX: 'hidden',
           minWidth: PANEL_WIDTH,
+          padding: 'var(--space-3)',
         }}
       >
-        {entries.length === 0 ? (
+        {displayEntries.length === 0 ? (
           <div
             style={{
               padding: 'var(--space-6) var(--space-4)',
@@ -222,78 +218,130 @@ export function KanbanActivityPanel({
               fontSize: 'var(--text-caption1)',
             }}
           >
-            {streaming ? 'Waiting for activity\u2026' : 'No activity yet'}
+            {error
+              ? error
+              : streaming
+                ? 'Waiting for activity\u2026'
+                : 'No activity yet'}
           </div>
         ) : (
-          entries.map((entry) => (
+          displayEntries.map((entry) => {
+            const agent = entry.agentId
+              ? agents.find((candidate) => candidate.id === entry.agentId) ?? null
+              : null
+            const parent = agent?.reportsTo
+              ? agents.find((candidate) => candidate.id === agent.reportsTo) ?? null
+              : null
+            const isSystem = entry.agentId === null
+
+            return (
             <div
               key={entry.id}
               style={{
-                padding: 'var(--space-3) var(--space-4)',
-                borderBottom: '1px solid var(--separator)',
+                padding: '12px 12px 11px',
+                marginBottom: '10px',
+                borderRadius: '14px',
+                border: '1px solid rgba(255,255,255,0.04)',
+                background: isSystem
+                  ? 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.015) 100%)'
+                  : 'linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.018) 100%)',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)',
               }}
             >
-              {/* Agent name + time */}
               <div
                 style={{
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-2)',
-                  marginBottom: 2,
+                  alignItems: 'flex-start',
+                  gap: '10px',
                 }}
               >
-                <span
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: entry.agentColor,
-                    flexShrink: 0,
-                  }}
-                />
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: entry.agentColor,
-                    flex: 1,
-                    minWidth: 0,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {entry.agentName}
-                </span>
-                <span
-                  style={{
-                    fontSize: 10,
-                    color: 'var(--text-tertiary)',
-                    flexShrink: 0,
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {formatRelativeTime(entry.timestamp)}
-                </span>
+                {agent ? (
+                  <AgentAvatar agent={agent} size={28} borderRadius={10} />
+                ) : (
+                  <div
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 10,
+                      background: 'rgba(255,255,255,0.06)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'var(--text-secondary)',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Activity size={14} />
+                  </div>
+                )}
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'baseline',
+                      justifyContent: 'space-between',
+                      gap: '8px',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: entry.agentColor,
+                          letterSpacing: '-0.01em',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {entry.agentName}
+                      </div>
+                      {parent && (
+                        <div
+                          style={{
+                            fontSize: 10,
+                            color: 'var(--text-tertiary)',
+                            marginTop: '1px',
+                          }}
+                        >
+                          via {parent.name}
+                        </div>
+                      )}
+                    </div>
+
+                    <span
+                      style={{
+                        fontSize: 10,
+                        color: 'var(--text-tertiary)',
+                        flexShrink: 0,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {formatRelativeTime(entry.timestamp)}
+                    </span>
+                  </div>
+
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 13,
+                      color: isSystem ? 'var(--text-secondary)' : 'rgba(255,255,255,0.86)',
+                      lineHeight: 1.45,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {entry.summary}
+                  </p>
+                </div>
               </div>
-              {/* Summary */}
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 11,
-                  color: 'var(--text-secondary)',
-                  lineHeight: 1.4,
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                  paddingLeft: 16,
-                }}
-              >
-                {entry.summary}
-              </p>
             </div>
-          ))
+          )})
         )}
       </div>
     </div>

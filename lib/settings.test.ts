@@ -34,6 +34,7 @@ describe('loadSettings', () => {
       iconBgHidden: false,
       emojiOnly: false,
       operatorName: null,
+      missionStatement: null,
       agentOverrides: {},
       liveStreamPosition: null,
       kanbanActivityOpen: false,
@@ -76,6 +77,7 @@ describe('loadSettings', () => {
     expect(s.portalName).toBeNull()
     expect(s.portalEmoji).toBeNull()
     expect(s.portalIcon).toBeNull()
+    expect(s.missionStatement).toBeNull()
     expect(s.agentOverrides).toEqual({})
   })
 })
@@ -91,6 +93,7 @@ describe('saveSettings', () => {
       iconBgHidden: false,
       emojiOnly: false,
       operatorName: null,
+      missionStatement: null,
       agentOverrides: {},
       liveStreamPosition: null,
       kanbanActivityOpen: false,
@@ -112,6 +115,7 @@ describe('saveSettings', () => {
       iconBgHidden: false,
       emojiOnly: false,
       operatorName: null,
+      missionStatement: 'Help growth-stage clients turn AI operations into measurable outcomes.',
       agentOverrides: {
         vera: { emoji: '🧙', profileImage: 'data:image/jpeg;base64,abc' },
       },

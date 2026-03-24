@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { MessageSquare, Send, RefreshCw } from 'lucide-react'
 import { generateId } from '@/lib/id'
 import type { StakeholderSummary } from '@/lib/stakeholder/types'
+import { useSettings } from '@/app/settings-provider'
 
 interface ChatMessage {
   id: string
@@ -19,11 +20,18 @@ const SUGGESTED_QUESTIONS = [
   'Summarize the current status in two sentences.',
 ]
 
-function buildContextPrompt(summary: StakeholderSummary, audienceLabel: string): string {
+function buildContextPrompt(summary: StakeholderSummary, audienceLabel: string, missionStatement: string | null): string {
   const lines: string[] = [
     `You are a helpful assistant embedded in the ${audienceLabel} Hub of a dashboard that monitors AI agent operations.`,
     `The user viewing this page is an external client. Answer their questions clearly and concisely using the data below.`,
     `Do not use em dashes. Keep language plain and professional.`,
+  ]
+
+  if (missionStatement) {
+    lines.push(`Use this mission statement as the north star for recommendations: ${missionStatement}`)
+  }
+
+  lines.push(
     '',
     `## Current Status: ${summary.overallStatus.replace(/_/g, ' ').toUpperCase()}`,
     `Window: ${summary.range}`,
@@ -37,7 +45,7 @@ function buildContextPrompt(summary: StakeholderSummary, audienceLabel: string):
     `- Failed deliveries: ${summary.metrics.failedDeliveries}`,
     `- Open risks: ${summary.metrics.openRisks}`,
     `- Completed outputs: ${summary.metrics.completedOutputs}`,
-  ]
+  )
 
   if (summary.outcomes.length > 0) {
     lines.push('', '## Key Outcomes')
@@ -85,6 +93,7 @@ export function StakeholderChat({
   audienceLabel: string
   agentId: string
 }) {
+  const { settings } = useSettings()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
@@ -115,7 +124,7 @@ export function StakeholderChat({
       setMessages((prev) => [...prev, userMsg, assistantMsg])
       setIsStreaming(true)
 
-      const contextPrompt = buildContextPrompt(summary, audienceLabel)
+      const contextPrompt = buildContextPrompt(summary, audienceLabel, settings.missionStatement)
       const allMessages = [...messages, userMsg]
       const apiMessages = [
         { role: 'user' as const, content: contextPrompt },
@@ -130,7 +139,10 @@ export function StakeholderChat({
         const res = await fetch(`/api/chat/${agentId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: apiMessages }),
+          body: JSON.stringify({
+            messages: apiMessages,
+            missionStatement: settings.missionStatement,
+          }),
         })
 
         if (!res.ok || !res.body) {
@@ -191,7 +203,7 @@ export function StakeholderChat({
         textareaRef.current?.focus()
       }
     },
-    [input, isStreaming, messages, summary, audienceLabel, agentId],
+    [input, isStreaming, messages, summary, audienceLabel, agentId, settings.missionStatement],
   )
 
   const handleKeyDown = useCallback(

@@ -5,6 +5,7 @@ import type { KanbanTicket, TicketStatus } from './types'
 import type { KanbanStore } from './store'
 import { executeWork, getWorkPrompt, parseWorkDisposition, persistWorkChat } from './automation'
 import { generateId } from '../id'
+import { useSettings } from '@/app/settings-provider'
 
 const MAX_CONCURRENT_WORK = 3
 
@@ -51,6 +52,7 @@ async function releaseLock(ticketId: string): Promise<void> {
 }
 
 export function useAgentWork({ tickets, onUpdateTicket }: UseAgentWorkOptions) {
+  const { settings } = useSettings()
   const activeWork = useRef<Set<string>>(new Set())
   const abortControllers = useRef<Map<string, AbortController>>(new Map())
   const unmounted = useRef(false)
@@ -93,7 +95,7 @@ export function useAgentWork({ tickets, onUpdateTicket }: UseAgentWorkOptions) {
       workError: null,
     })
 
-    const result = await executeWork(assigneeId, ticket, undefined, controller.signal)
+    const result = await executeWork(assigneeId, ticket, settings.missionStatement, undefined, controller.signal)
 
     // Release lock regardless of outcome
     await releaseLock(id)
@@ -127,7 +129,7 @@ export function useAgentWork({ tickets, onUpdateTicket }: UseAgentWorkOptions) {
     }
 
     activeWork.current.delete(id)
-  }, [onUpdateTicket])
+  }, [onUpdateTicket, settings.missionStatement])
 
   // Recover tickets stuck in working/starting state (e.g. browser closed mid-work)
   // If workStartedAt is older than timeout + 30s buffer and not actively tracked, mark as failed.

@@ -28,6 +28,7 @@ interface SettingsContextValue {
   setIconBgHidden: (hidden: boolean) => void
   setEmojiOnly: (emojiOnly: boolean) => void
   setOperatorName: (name: string | null) => void
+  setMissionStatement: (statement: string | null) => void
   setAgentOverride: (agentId: string, override: AgentOverride) => void
   clearAgentOverride: (agentId: string) => void
   getAgentDisplay: (agent: Agent) => AgentDisplay
@@ -37,7 +38,7 @@ interface SettingsContextValue {
 }
 
 const SettingsContext = createContext<SettingsContextValue>({
-  settings: { accentColor: null, portalName: null, portalSubtitle: null, portalEmoji: null, portalIcon: null, iconBgHidden: false, emojiOnly: false, operatorName: null, agentOverrides: {}, liveStreamPosition: null, kanbanActivityOpen: false },
+  settings: { accentColor: null, portalName: null, portalSubtitle: null, portalEmoji: null, portalIcon: null, iconBgHidden: false, emojiOnly: false, operatorName: null, missionStatement: null, agentOverrides: {}, liveStreamPosition: null, kanbanActivityOpen: false },
   setAccentColor: () => {},
   setPortalName: () => {},
   setPortalSubtitle: () => {},
@@ -46,6 +47,7 @@ const SettingsContext = createContext<SettingsContextValue>({
   setIconBgHidden: () => {},
   setEmojiOnly: () => {},
   setOperatorName: () => {},
+  setMissionStatement: () => {},
   setAgentOverride: () => {},
   clearAgentOverride: () => {},
   getAgentDisplay: (agent) => ({ emoji: agent.emoji }),
@@ -138,6 +140,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     [settings, update],
   )
 
+  const setMissionStatement = useCallback(
+    (statement: string | null) => {
+      update({ ...settings, missionStatement: statement || null })
+    },
+    [settings, update],
+  )
+
   const setAgentOverride = useCallback(
     (agentId: string, override: AgentOverride) => {
       const existing = settings.agentOverrides[agentId] || {}
@@ -196,6 +205,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       iconBgHidden: false,
       emojiOnly: false,
       operatorName: null,
+      missionStatement: null,
       agentOverrides: {},
       liveStreamPosition: null,
       kanbanActivityOpen: false,
@@ -215,6 +225,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setIconBgHidden,
         setEmojiOnly,
         setOperatorName,
+        setMissionStatement,
         setAgentOverride,
         clearAgentOverride,
         getAgentDisplay,

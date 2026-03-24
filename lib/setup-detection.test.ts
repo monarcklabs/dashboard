@@ -18,7 +18,10 @@ import { join } from 'path'
 const HOME = homedir()
 const OPENCLAW_DIR = join(HOME, '.openclaw')
 const WORKSPACE_PATH = join(OPENCLAW_DIR, 'workspace')
+const CONFIG_WORKSPACE_PATH = join(OPENCLAW_DIR, 'workspace-configured')
+const AGENT_WORKSPACE_PATH = join(OPENCLAW_DIR, 'agents', 'main', 'workspace')
 const CONFIG_PATH = join(OPENCLAW_DIR, 'openclaw.json')
+const WORKSPACE_MAIN_PATH = join(OPENCLAW_DIR, 'workspace-main')
 
 // ── Hoisted mocks ─────────────────────────────────────────────────
 
@@ -67,11 +70,47 @@ describe('detectWorkspacePath', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockExistsSync.mockReturnValue(false)
+    mockReadFileSync.mockReset()
   })
 
-  it('returns null when ~/.openclaw/workspace does not exist', () => {
+  it('returns null when no known workspace location exists', () => {
     expect(detectWorkspacePath()).toBeNull()
     expect(mockExistsSync).toHaveBeenCalledWith(WORKSPACE_PATH)
+  })
+
+  it('prefers the canonical workspace path from openclaw.json', () => {
+    mockExistsSync.mockImplementation((p: string) => p === CONFIG_PATH || p === CONFIG_WORKSPACE_PATH)
+    mockReadFileSync.mockReturnValue(JSON.stringify({
+      agents: {
+        defaults: {
+          workspace: CONFIG_WORKSPACE_PATH,
+        },
+      },
+    }))
+
+    expect(detectWorkspacePath()).toBe(CONFIG_WORKSPACE_PATH)
+  })
+
+  it('falls back when openclaw.json workspace is missing on disk', () => {
+    mockExistsSync.mockImplementation((p: string) =>
+      p === CONFIG_PATH || p === AGENT_WORKSPACE_PATH
+    )
+    mockReadFileSync.mockReturnValue(JSON.stringify({
+      agents: {
+        defaults: {
+          workspace: CONFIG_WORKSPACE_PATH,
+        },
+      },
+    }))
+
+    expect(detectWorkspacePath()).toBe(AGENT_WORKSPACE_PATH)
+  })
+
+  it('falls back when openclaw.json is malformed', () => {
+    mockExistsSync.mockImplementation((p: string) => p === CONFIG_PATH || p === WORKSPACE_MAIN_PATH)
+    mockReadFileSync.mockReturnValue('not json')
+
+    expect(detectWorkspacePath()).toBe(WORKSPACE_MAIN_PATH)
   })
 
   it('returns path when ~/.openclaw/workspace exists', () => {

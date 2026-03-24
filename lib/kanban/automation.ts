@@ -120,6 +120,7 @@ const EMPTY_RUNTIME_RESPONSE_ERROR = 'Agent runtime did not return a response.'
 export async function executeWork(
   agentId: string,
   ticket: KanbanTicket,
+  missionStatement?: string | null,
   onChunk?: (chunk: string) => void,
   externalSignal?: AbortSignal,
 ): Promise<WorkResult> {
@@ -144,6 +145,7 @@ export async function executeWork(
       signal: controller.signal,
       body: JSON.stringify({
         messages: [{ role: 'user', content: prompt }],
+        missionStatement: missionStatement || null,
         ticket: {
           title: ticket.title,
           description: ticket.description,

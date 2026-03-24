@@ -1,20 +1,19 @@
 export const runtime = 'nodejs'
 
 import { getAgent } from '@/lib/agents'
-import OpenAI from 'openai'
-import { gatewayBaseUrl } from '@/lib/env'
+import { buildTextPrompt, sendViaOpenClaw } from '@/lib/anthropic'
+import { getOpenAIClient } from '@/lib/openai'
 import { buildKanbanSystemPrompt, sanitizeKanbanTicketContext, type AgentEnvironmentContext } from '@/lib/kanban/chat-prompt'
 import { getIntegrationsSummary, getGoogleWorkspaceConfig } from '@/lib/integrations'
 import { getActiveComposioApps } from '@/lib/composio'
 import { humanizeKanbanChatError } from '@/lib/kanban/chat-errors'
 import { downloadDriveFile } from '@/lib/google-drive'
-
-const openai = new OpenAI({
-  baseURL: gatewayBaseUrl(),
-  apiKey: process.env.OPENCLAW_GATEWAY_TOKEN,
-})
+import type OpenAI from 'openai'
+import type { ApiMessage } from '@/lib/validation'
 
 const TEXT_MIME_PREFIXES = ['text/', 'application/json', 'application/xml', 'application/javascript']
+const ASYNC_FALLBACK_TIMEOUT_MS = 120_000
+const MAX_MISSION_STATEMENT = 2000
 
 function extractTextFromDataUrl(dataUrl: string): string | null {
   const match = dataUrl.match(/^data:([^;,]+)(;base64)?,([^]*)$/)
@@ -37,10 +36,80 @@ function isValidMessage(m: unknown): m is { role: 'user' | 'assistant'; content:
   )
 }
 
+function isGatewayTimeoutError(error: unknown): boolean {
+  const raw = typeof error === 'string'
+    ? error
+    : error instanceof Error
+      ? error.message
+      : ''
+
+  return /gateway timeout|timeout after \d+ms|timed out|etimedout/i.test(raw)
+}
+
+function buildFallbackSessionKey(agentId: string): string {
+  const cleanAgentId = agentId.replace(/[^a-z0-9_-]/gi, '-').slice(0, 40) || 'agent'
+  const rand = Math.random().toString(36).slice(2, 8)
+  return `kanban:${cleanAgentId}:${Date.now().toString(36)}:${rand}`
+}
+
+function gatewayToken(): string {
+  return process.env.OPENCLAW_GATEWAY_TOKEN || ''
+}
+
+function createSseResponseFromText(content: string): Response {
+  const encoder = new TextEncoder()
+  const streamBody = new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`))
+      controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+      controller.close()
+    },
+  })
+
+  return new Response(streamBody, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    },
+  })
+}
+
+function sanitizeMissionStatement(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed ? trimmed.slice(0, MAX_MISSION_STATEMENT) : null
+}
+
+async function tryAsyncGatewayFallback(
+  agentId: string,
+  systemPrompt: string,
+  messages: { role: 'user' | 'assistant'; content: string }[],
+  signal: AbortSignal,
+): Promise<string | null> {
+  const token = gatewayToken()
+  if (!token) return null
+
+  const apiMessages: ApiMessage[] = messages.map((message) => ({
+    role: message.role,
+    content: message.content,
+  }))
+
+  return sendViaOpenClaw({
+    gatewayToken: token,
+    message: buildTextPrompt(systemPrompt, apiMessages),
+    attachments: [],
+    sessionKey: buildFallbackSessionKey(agentId),
+    timeoutMs: ASYNC_FALLBACK_TIMEOUT_MS,
+    signal,
+  })
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const openai = getOpenAIClient()
   const { id } = await params
   const agent = await getAgent(id)
 
@@ -71,6 +140,7 @@ export async function POST(
   const messages = rawMessages as { role: 'user' | 'assistant'; content: string }[]
 
   const ticket = sanitizeKanbanTicketContext(body.ticket)
+  const missionStatement = sanitizeMissionStatement((body as Record<string, unknown>).missionStatement)
 
   const gwsConfig = getGoogleWorkspaceConfig()
 
@@ -118,7 +188,7 @@ export async function POST(
     // Non-fatal — proceed without environment context
   }
 
-  const systemPrompt = buildKanbanSystemPrompt(agent, ticket, environment)
+  const systemPrompt = buildKanbanSystemPrompt(agent, ticket, environment, missionStatement)
 
   try {
     const stream = await openai.chat.completions.create({
@@ -133,10 +203,12 @@ export async function POST(
     const streamBody = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder()
+        let streamedAnyContent = false
         try {
           for await (const chunk of stream) {
             const content = chunk.choices[0]?.delta?.content || ''
             if (content) {
+              streamedAnyContent = true
               controller.enqueue(
                 encoder.encode(`data: ${JSON.stringify({ content })}\n\n`)
               )
@@ -144,6 +216,17 @@ export async function POST(
           }
           controller.enqueue(encoder.encode('data: [DONE]\n\n'))
         } catch (err) {
+          if (!streamedAnyContent && isGatewayTimeoutError(err)) {
+            const fallbackContent = await tryAsyncGatewayFallback(id, systemPrompt, messages, request.signal)
+            if (fallbackContent?.trim()) {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ content: fallbackContent })}\n\n`)
+              )
+              controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+              return
+            }
+          }
+
           const errMsg = humanizeKanbanChatError(err)
           console.error(`Kanban chat stream error [agentId=${id}]:`, err instanceof Error ? err.message : err)
           // Signal error to client before closing
@@ -165,6 +248,13 @@ export async function POST(
       },
     })
   } catch (err) {
+    if (isGatewayTimeoutError(err)) {
+      const fallbackContent = await tryAsyncGatewayFallback(id, systemPrompt, messages, request.signal)
+      if (fallbackContent?.trim()) {
+        return createSseResponseFromText(fallbackContent)
+      }
+    }
+
     const errMsg = humanizeKanbanChatError(err)
     console.error(`Kanban chat API error [agentId=${id}]:`, err instanceof Error ? err.message : err)
     return new Response(

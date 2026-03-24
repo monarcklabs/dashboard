@@ -12,6 +12,7 @@ import { generateId } from '@/lib/id'
 import { exportAsPdf, exportAsDocx } from '@/lib/export-markdown'
 import { humanizeKanbanChatError, readKanbanChatErrorResponse } from '@/lib/kanban/chat-errors'
 import { formatMessage } from '@/lib/format-message'
+import { useSettings } from '@/app/settings-provider'
 
 /* ── Chat message type (local to kanban) ─────────────── */
 
@@ -46,6 +47,7 @@ export function TicketDetailPanel({
   onDelete,
   onRetryWork,
 }: TicketDetailPanelProps) {
+  const { settings } = useSettings()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [titleDraft, setTitleDraft] = useState(ticket.title)
@@ -226,6 +228,7 @@ export function TicketDetailPanel({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: apiMessages,
+          missionStatement: settings.missionStatement,
           ticket: {
             title: ticket.title,
             description: ticket.description,
@@ -318,7 +321,7 @@ export function TicketDetailPanel({
       setIsStreaming(false)
       textareaRef.current?.focus()
     }
-  }, [input, isStreaming, agent, messages, ticket])
+  }, [input, isStreaming, agent, messages, ticket, settings.missionStatement])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {

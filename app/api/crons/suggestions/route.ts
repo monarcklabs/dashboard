@@ -5,15 +5,11 @@ import { getAgents } from '@/lib/agents'
 import { getActiveComposioApps } from '@/lib/composio'
 import { getIntegrationsSummary } from '@/lib/integrations'
 import { getGoogleWorkspaceConfig } from '@/lib/integrations'
+import { getOpenAIClient } from '@/lib/openai'
 import { buildCronSuggestionsPrompt } from '@/lib/pipeline-utils'
-import { gatewayBaseUrl } from '@/lib/env'
-import OpenAI from 'openai'
 
 export async function GET() {
-  const openai = new OpenAI({
-    baseURL: gatewayBaseUrl(),
-    apiKey: process.env.OPENCLAW_GATEWAY_TOKEN,
-  })
+  const openai = getOpenAIClient()
   try {
     const [crons, agents, composioApps, integrationsSummary, gwsConfig] = await Promise.all([
       getCrons(),

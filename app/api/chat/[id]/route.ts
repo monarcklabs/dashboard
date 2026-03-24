@@ -3,21 +3,23 @@ export const runtime = 'nodejs'
 import { getAgent } from '@/lib/agents'
 import { validateChatMessages } from '@/lib/validation'
 import { hasImageContent, extractImageAttachments, buildTextPrompt, sendViaOpenClaw } from '@/lib/anthropic'
-import OpenAI from 'openai'
-import { gatewayBaseUrl } from '@/lib/env'
-
-// Route through the OpenClaw gateway — no separate API key needed
-const openai = new OpenAI({
-  baseURL: gatewayBaseUrl(),
-  apiKey: process.env.OPENCLAW_GATEWAY_TOKEN,
-})
+import { getOpenAIClient } from '@/lib/openai'
+import type OpenAI from 'openai'
 
 const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || ''
+const MAX_MISSION_STATEMENT = 2000
+
+function sanitizeMissionStatement(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed ? trimmed.slice(0, MAX_MISSION_STATEMENT) : null
+}
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const openai = getOpenAIClient()
   const { id } = await params
   const agent = await getAgent(id)
 
@@ -50,10 +52,11 @@ export async function POST(
 
   const rawBody = body as Record<string, unknown>
   const operatorName = typeof rawBody.operatorName === 'string' ? rawBody.operatorName : 'Operator'
+  const missionStatement = sanitizeMissionStatement(rawBody.missionStatement)
 
   const systemPrompt = agent.soul
-    ? `${agent.soul}\n\nYou are speaking directly with ${operatorName}, your operator. Stay fully in character. Be concise — this is a live chat. 2-4 sentences unless detail is asked for. No em dashes.`
-    : `You are ${agent.name}, ${agent.title}. Respond in character. Be concise. No em dashes.`
+    ? `${agent.soul}\n\nYou are speaking directly with ${operatorName}, your operator. Stay fully in character. Be concise — this is a live chat. 2-4 sentences unless detail is asked for. No em dashes.${missionStatement ? `\n\nMission statement:\n${missionStatement}\nUse it to keep recommendations and decisions aligned with the user's goals.` : ''}`
+    : `You are ${agent.name}, ${agent.title}. Respond in character. Be concise. No em dashes.${missionStatement ? `\n\nMission statement:\n${missionStatement}\nUse it to keep recommendations and decisions aligned with the user's goals.` : ''}`
 
   // When the LATEST user message contains images, use the OpenClaw gateway's
   // chat.send pipeline. Only check the last message — older messages with images

@@ -37,7 +37,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: CLIENT_HUB_PATH, label: 'Client', icon: BriefcaseBusiness, clientOnly: true },
+  { href: CLIENT_HUB_PATH, label: 'Dashboard', icon: BriefcaseBusiness, clientOnly: true },
   { href: '/', label: 'Map', icon: Map, badge: 'agents' },
   { href: '/kanban', label: 'Kanban', icon: Columns3 },
   { href: '/projects', label: 'Projects', icon: FolderKanban },

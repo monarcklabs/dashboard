@@ -50,7 +50,7 @@ const STATIC_PAGES: SearchResult[] = [
 
 const CLIENT_PAGE: SearchResult = {
   id: 'page-client',
-  label: 'Client',
+  label: 'Dashboard',
   icon: <BriefcaseBusiness size={16} />,
   href: CLIENT_HUB_PATH,
   category: 'Pages',

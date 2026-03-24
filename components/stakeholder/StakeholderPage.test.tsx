@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { StakeholderPage } from '@/components/stakeholder/StakeholderPage'
 import type { StakeholderSummary } from '@/lib/stakeholder/types'
+import { SettingsProvider } from '@/app/settings-provider'
 
 const summary: StakeholderSummary = {
   range: '7d',
@@ -74,11 +75,13 @@ describe('StakeholderPage', () => {
     })
 
     render(
-      <StakeholderPage
-        audienceLabel="Stakeholder"
-        summaryPath="/api/stakeholder/summary"
-        exportPath="/api/stakeholder/export"
-      />,
+      <SettingsProvider>
+        <StakeholderPage
+          audienceLabel="Stakeholder"
+          summaryPath="/api/stakeholder/summary"
+          exportPath="/api/stakeholder/export"
+        />
+      </SettingsProvider>,
     )
 
     await waitFor(() => {
@@ -90,7 +93,7 @@ describe('StakeholderPage', () => {
     expect(screen.getAllByText('Weekly Brief').length).toBeGreaterThan(0)
   })
 
-  it('uses client wording and exports through the client endpoint', async () => {
+  it('uses dashboard wording and exports through the client endpoint', async () => {
     mockFetch.mockImplementation(async (url: string) => {
       if (url.includes('/api/agents')) {
         return { ok: true, json: async () => [{ id: 'main', reportsTo: null }] }
@@ -102,15 +105,17 @@ describe('StakeholderPage', () => {
     })
 
     render(
-      <StakeholderPage
-        audienceLabel="Client"
-        summaryPath="/api/client/summary"
-        exportPath="/api/client/export"
-      />,
+      <SettingsProvider>
+        <StakeholderPage
+          audienceLabel="Dashboard"
+          summaryPath="/api/client/summary"
+          exportPath="/api/client/export"
+        />
+      </SettingsProvider>,
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Client Hub')).toBeTruthy()
+      expect(screen.getByText('Dashboard Hub')).toBeTruthy()
     })
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Export' })[0])
@@ -129,5 +134,30 @@ describe('StakeholderPage', () => {
       '_blank',
       'noopener,noreferrer',
     )
+  })
+
+  it('renders the mission statement field', async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.includes('/api/agents')) {
+        return { ok: true, json: async () => [{ id: 'main', reportsTo: null }] }
+      }
+      return { ok: true, json: async () => summary }
+    })
+
+    render(
+      <SettingsProvider>
+        <StakeholderPage
+          audienceLabel="Dashboard"
+          summaryPath="/api/client/summary"
+          exportPath="/api/client/export"
+        />
+      </SettingsProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Mission statement')).toBeTruthy()
+    })
+
+    expect(screen.getByPlaceholderText(/Help us become the most trusted/i)).toBeTruthy()
   })
 })

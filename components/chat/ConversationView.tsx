@@ -236,7 +236,11 @@ export function ConversationView({ agent, conversation, onUpdate, onBack }: Conv
       const res = await fetch(`/api/chat/${agent.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: apiMessages, operatorName: settings.operatorName }),
+        body: JSON.stringify({
+          messages: apiMessages,
+          operatorName: settings.operatorName,
+          missionStatement: settings.missionStatement,
+        }),
       })
 
       if (!res.ok || !res.body) throw new Error('Stream failed')

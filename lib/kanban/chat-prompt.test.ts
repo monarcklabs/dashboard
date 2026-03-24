@@ -95,4 +95,17 @@ describe('buildKanbanSystemPrompt', () => {
     expect(prompt).toContain('Session memory is enabled for this ticket.')
     expect(prompt).not.toContain('Ignore any hidden or persistent session memory')
   })
+
+  it('includes the mission statement when provided', () => {
+    const prompt = buildKanbanSystemPrompt(agent, sanitizeKanbanTicketContext({
+      title: 'Find legal',
+      description: 'Continue prior work.',
+      useSessionMemory: false,
+      status: 'todo',
+      priority: 'medium',
+    }), null, 'Become the most trusted advisor in AI governance.')
+
+    expect(prompt).toContain('Mission statement: Become the most trusted advisor in AI governance.')
+    expect(prompt).toContain('align recommendations, priorities, and trade-offs')
+  })
 })

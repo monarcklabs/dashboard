@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { CLIENT_HUB_PATH, shouldHideClientNavPath, shouldShowClientHub } from './branding'
+import {
+  CLIENT_HUB_PATH,
+  isMonarckProductionHost,
+  shouldHideClientNavPath,
+  shouldShowClientHub,
+} from './branding'
 
 describe('shouldHideClientNavPath', () => {
   it('hides client-only paths on the production host', () => {
@@ -31,6 +36,18 @@ describe('shouldShowClientHub', () => {
   })
 
   it('exposes a stable client hub path', () => {
-    expect(CLIENT_HUB_PATH).toBe('/client')
+    expect(CLIENT_HUB_PATH).toBe('/dashboard')
+  })
+})
+
+describe('isMonarckProductionHost', () => {
+  it('matches the explicit client-facing hosts', () => {
+    expect(isMonarckProductionHost('monarck.ai')).toBe(true)
+    expect(isMonarckProductionHost('app.monarck.ai')).toBe(true)
+  })
+
+  it('does not treat dashboard hosts as client-facing', () => {
+    expect(isMonarckProductionHost('dashboard.monarck.ai')).toBe(false)
+    expect(isMonarckProductionHost('staging.monarck.ai')).toBe(false)
   })
 })

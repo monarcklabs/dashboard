@@ -1,13 +1,9 @@
 export const runtime = 'nodejs'
 
-import OpenAI from 'openai'
-import { gatewayBaseUrl } from '@/lib/env'
+import { getOpenAIClient } from '@/lib/openai'
 
 export async function POST(request: Request) {
-  const openai = new OpenAI({
-    baseURL: gatewayBaseUrl(),
-    apiKey: process.env.OPENCLAW_GATEWAY_TOKEN,
-  })
+  const openai = getOpenAIClient()
   let formData: FormData
   try {
     formData = await request.formData()

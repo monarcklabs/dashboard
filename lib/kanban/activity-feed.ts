@@ -3,11 +3,17 @@ import type { KanbanStore } from './store'
 
 export interface ActivityEntry {
   id: string
+  agentId: string | null
   agentName: string
   agentColor: string
   summary: string
   timestamp: number
   source: 'log' | 'ticket'
+}
+
+interface ParsedLogContext {
+  subsystem: string | null
+  message: string
 }
 
 /**
@@ -75,12 +81,68 @@ export function formatRelativeTime(timestamp: number | string): string {
   return `${days}d ago`
 }
 
+function parseLogContext(message: string): ParsedLogContext {
+  const match = message.match(/^\{"subsystem":"([^"]+)"\}\s*(.*)$/)
+  if (!match) {
+    return { subsystem: null, message }
+  }
+
+  return {
+    subsystem: match[1] || null,
+    message: match[2] || '',
+  }
+}
+
+function shouldIgnoreSubsystemNoise(line: LiveLogLine, subsystem: string | null, message: string): boolean {
+  if (!subsystem) return false
+
+  if (
+    subsystem === 'gateway/channels/discord' ||
+    subsystem === 'gateway/health-monitor'
+  ) {
+    if (line.level === 'error') return false
+
+    if (
+      /discord startup|deploy-rest:|fetch-bot-|logged in to discord as|message content intent|health-monitor: restarting/i.test(message)
+    ) {
+      return true
+    }
+  }
+
+  return false
+}
+
+function humanizeSystemLog(subsystem: string | null, message: string): string {
+  if (/proxy headers detected from untrusted address/i.test(message)) {
+    return 'Gateway saw proxy headers from an untrusted address.'
+  }
+
+  if (/gateway timeout|timeout after \d+ms/i.test(message)) {
+    return 'Gateway request timed out.'
+  }
+
+  if (/connection refused|econnrefused/i.test(message)) {
+    return 'Gateway connection failed.'
+  }
+
+  if (subsystem === 'gateway/channels/discord' && /logged in to discord as/i.test(message)) {
+    return 'Discord integration connected.'
+  }
+
+  if (subsystem === 'gateway/health-monitor' && /restarting/i.test(message)) {
+    return 'Gateway health monitor restarted a service.'
+  }
+
+  return message
+}
+
 /**
  * Transform a raw LiveLogLine message into a short, human-readable summary.
  * Strips JSON noise, extracts the meaningful content.
  */
 export function formatLogMessage(line: LiveLogLine): string {
-  let msg = line.message
+  const context = parseLogContext(line.message)
+  let msg = humanizeSystemLog(context.subsystem, context.message)
 
   // If the message looks like raw JSON, try to extract a summary field
   if (msg.startsWith('{')) {
@@ -116,10 +178,16 @@ export function formatLogMessage(line: LiveLogLine): string {
 /**
  * Convert a LiveLogLine into an ActivityEntry.
  */
-export function logLineToEntry(line: LiveLogLine, agents: Agent[], index: number): ActivityEntry {
-  const agent = extractAgentFromLog(line.message, agents)
+export function logLineToEntry(line: LiveLogLine, agents: Agent[], index: number): ActivityEntry | null {
+  const context = parseLogContext(line.message)
+  if (shouldIgnoreSubsystemNoise(line, context.subsystem, context.message)) {
+    return null
+  }
+
+  const agent = extractAgentFromLog(context.message, agents)
   return {
     id: `log-${line.time}-${index}`,
+    agentId: agent?.id || null,
     agentName: agent?.name || 'System',
     agentColor: agent?.color || '#6b7280',
     summary: formatLogMessage(line),
@@ -157,6 +225,7 @@ export function diffTicketEvents(
         : null
       entries.push({
         id: `ticket-new-${id}-${now}`,
+        agentId: agent?.id || null,
         agentName: agent?.name || 'System',
         agentColor: agent?.color || '#6b7280',
         summary: `New ticket: "${truncate(ticket.title, 50)}"`,
@@ -173,6 +242,7 @@ export function diffTicketEvents(
         : null
       entries.push({
         id: `ticket-move-${id}-${now}`,
+        agentId: agent?.id || null,
         agentName: agent?.name || 'System',
         agentColor: agent?.color || '#6b7280',
         summary: `"${truncate(ticket.title, 40)}" moved to ${STATUS_LABELS[ticket.status] || ticket.status}`,
@@ -208,6 +278,7 @@ export function diffTicketEvents(
       if (summary) {
         entries.push({
           id: `ticket-work-${id}-${ticket.workState}-${now}`,
+          agentId: agent?.id || null,
           agentName: agent?.name || 'System',
           agentColor: agent?.color || '#6b7280',
           summary,
