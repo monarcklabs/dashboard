@@ -6,13 +6,100 @@ import { hasImageContent, extractImageAttachments, buildTextPrompt, sendViaOpenC
 import { getOpenAIClient } from '@/lib/openai'
 import type OpenAI from 'openai'
 
-const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || ''
+const ASYNC_FALLBACK_TIMEOUT_MS = 120_000
 const MAX_MISSION_STATEMENT = 2000
 
 function sanitizeMissionStatement(value: unknown): string | null {
   if (typeof value !== 'string') return null
   const trimmed = value.trim()
   return trimmed ? trimmed.slice(0, MAX_MISSION_STATEMENT) : null
+}
+
+function isGatewayTimeoutError(error: unknown): boolean {
+  const raw = typeof error === 'string'
+    ? error
+    : error instanceof Error
+      ? error.message
+      : ''
+
+  return /gateway timeout|timeout after \d+ms|timed out|etimedout/i.test(raw)
+}
+
+function buildFallbackSessionKey(agentId: string): string {
+  const cleanAgentId = agentId.replace(/[^a-z0-9_-]/gi, '-').slice(0, 40) || 'agent'
+  const rand = Math.random().toString(36).slice(2, 8)
+  return `chat:${cleanAgentId}:${Date.now().toString(36)}:${rand}`
+}
+
+function createSseResponseFromText(content: string): Response {
+  const encoder = new TextEncoder()
+  const streamBody = new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`))
+      controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+      controller.close()
+    },
+  })
+
+  return new Response(streamBody, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    },
+  })
+}
+
+function gatewayToken(): string {
+  return process.env.OPENCLAW_GATEWAY_TOKEN || ''
+}
+
+function humanizeChatError(error: unknown): string {
+  const raw = typeof error === 'string'
+    ? error.trim()
+    : error instanceof Error
+      ? error.message.trim()
+      : ''
+
+  if (!raw) {
+    return 'Error getting response.'
+  }
+
+  if (/aborterror|aborted|timed out/i.test(raw)) {
+    return 'Agent response timed out.'
+  }
+
+  if (/gateway|econnrefused|fetch failed|network|socket hang up/i.test(raw)) {
+    return 'Chat failed. Make sure OpenClaw gateway is running.'
+  }
+
+  return raw
+}
+
+async function tryAsyncGatewayFallback(
+  agentId: string,
+  systemPrompt: string,
+  messages: OpenAI.ChatCompletionMessageParam[],
+  signal: AbortSignal,
+): Promise<string | null> {
+  const token = gatewayToken()
+  if (!token) return null
+
+  const textMessages = messages
+    .filter((message) => message.role === 'user' || message.role === 'assistant')
+    .map((message) => ({
+      role: message.role,
+      content: typeof message.content === 'string' ? message.content : '',
+    }))
+
+  return sendViaOpenClaw({
+    gatewayToken: token,
+    message: buildTextPrompt(systemPrompt, textMessages),
+    attachments: [],
+    sessionKey: buildFallbackSessionKey(agentId),
+    timeoutMs: ASYNC_FALLBACK_TIMEOUT_MS,
+    signal,
+  })
 }
 
 export async function POST(
@@ -58,18 +145,23 @@ export async function POST(
     ? `${agent.soul}\n\nYou are speaking directly with ${operatorName}, your operator. Stay fully in character. Be concise — this is a live chat. 2-4 sentences unless detail is asked for. No em dashes.${missionStatement ? `\n\nMission statement:\n${missionStatement}\nUse it to keep recommendations and decisions aligned with the user's goals.` : ''}`
     : `You are ${agent.name}, ${agent.title}. Respond in character. Be concise. No em dashes.${missionStatement ? `\n\nMission statement:\n${missionStatement}\nUse it to keep recommendations and decisions aligned with the user's goals.` : ''}`
 
+  const completionMessages = [
+    { role: 'system' as const, content: systemPrompt },
+    ...messages.map(m => ({ role: m.role, content: m.content })),
+  ] as OpenAI.ChatCompletionMessageParam[]
+
   // When the LATEST user message contains images, use the OpenClaw gateway's
   // chat.send pipeline. Only check the last message — older messages with images
   // should not force all future messages through this path.
   const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')
   const latestHasImages = lastUserMsg ? hasImageContent([lastUserMsg]) : false
 
-  if (latestHasImages && GATEWAY_TOKEN) {
+  if (latestHasImages && gatewayToken()) {
     const attachments = extractImageAttachments([lastUserMsg!])
     const textPrompt = buildTextPrompt(systemPrompt, messages)
 
     const response = await sendViaOpenClaw({
-      gatewayToken: GATEWAY_TOKEN,
+      gatewayToken: gatewayToken(),
       message: textPrompt,
       attachments,
       signal: request.signal,
@@ -99,19 +191,18 @@ export async function POST(
     const stream = await openai.chat.completions.create({
       model: agent.model || 'claude-sonnet-4-6',
       stream: true,
-      messages: [
-        { role: 'system' as const, content: systemPrompt },
-        ...messages.map(m => ({ role: m.role, content: m.content })),
-      ] as OpenAI.ChatCompletionMessageParam[],
+      messages: completionMessages,
     })
 
     const streamBody = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder()
+        let streamedAnyContent = false
         try {
           for await (const chunk of stream) {
             const content = chunk.choices[0]?.delta?.content || ''
             if (content) {
+              streamedAnyContent = true
               controller.enqueue(
                 encoder.encode(`data: ${JSON.stringify({ content })}\n\n`)
               )
@@ -119,7 +210,21 @@ export async function POST(
           }
           controller.enqueue(encoder.encode('data: [DONE]\n\n'))
         } catch (err) {
+          if (!streamedAnyContent && isGatewayTimeoutError(err)) {
+            const fallbackContent = await tryAsyncGatewayFallback(id, systemPrompt, completionMessages, request.signal)
+            if (fallbackContent?.trim()) {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ content: fallbackContent })}\n\n`)
+              )
+              controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+              return
+            }
+          }
+
           console.error('Stream error:', err)
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ error: humanizeChatError(err) })}\n\n`)
+          )
           controller.enqueue(encoder.encode('data: [DONE]\n\n'))
         } finally {
           controller.close()
@@ -135,11 +240,20 @@ export async function POST(
       },
     })
   } catch (err: unknown) {
+    if (isGatewayTimeoutError(err)) {
+      const fallbackContent = await tryAsyncGatewayFallback(id, systemPrompt, completionMessages, request.signal)
+      if (fallbackContent?.trim()) {
+        return createSseResponseFromText(fallbackContent)
+      }
+    }
+
     console.error('Chat API error:', err)
 
     let userMessage = 'Chat failed. Make sure OpenClaw gateway is running.'
     if (err instanceof Error && 'status' in err && (err as { status: number }).status === 405) {
       userMessage = 'Gateway returned 405. Enable the HTTP endpoint: set gateway.http.endpoints.chatCompletions.enabled = true in ~/.openclaw/openclaw.json, then restart the gateway.'
+    } else if (!(err instanceof Error && 'status' in err)) {
+      userMessage = humanizeChatError(err)
     }
 
     return new Response(
