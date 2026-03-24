@@ -1,12 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   loadTickets,
+  loadTicketSnapshot,
   saveTickets,
+  saveTicketSnapshot,
   createTicket,
   updateTicket,
   moveTicket,
   deleteTicket,
+  deleteTicketInSnapshot,
   getTicketsByStatus,
+  mergeTicketSnapshots,
+  sanitizeSnapshot,
+  type KanbanSnapshot,
   type KanbanStore,
 } from './store'
 
@@ -54,6 +60,32 @@ describe('loadTickets', () => {
     storage['clawport-kanban'] = 'not-json'
     expect(loadTickets()).toEqual({})
   })
+
+  it('returns tickets from snapshot format', () => {
+    storage['clawport-kanban'] = JSON.stringify({
+      tickets: { 'id-1': { id: 'id-1', title: 'Test' } },
+      deleted: { old: 1234 },
+    })
+    expect(loadTickets()['id-1']?.title).toBe('Test')
+  })
+})
+
+describe('loadTicketSnapshot', () => {
+  it('returns empty snapshot when nothing stored', () => {
+    expect(loadTicketSnapshot()).toEqual({ tickets: {}, deleted: {} })
+  })
+
+  it('keeps deletion tombstones and removes matching stale tickets', () => {
+    storage['clawport-kanban'] = JSON.stringify({
+      tickets: { 'id-1': { id: 'id-1', title: 'Test', updatedAt: 1000 } },
+      deleted: { 'id-1': 2000 },
+    })
+
+    expect(loadTicketSnapshot()).toEqual({
+      tickets: {},
+      deleted: { 'id-1': 2000 },
+    })
+  })
 })
 
 describe('saveTickets', () => {
@@ -61,6 +93,14 @@ describe('saveTickets', () => {
     const store: KanbanStore = {}
     saveTickets(store)
     expect(storage['clawport-kanban']).toBe('{}')
+  })
+})
+
+describe('saveTicketSnapshot', () => {
+  it('persists snapshot format', () => {
+    const snapshot: KanbanSnapshot = { tickets: {}, deleted: { t1: 1234 } }
+    saveTicketSnapshot(snapshot)
+    expect(storage['clawport-kanban']).toBe(JSON.stringify(snapshot))
   })
 })
 
@@ -210,6 +250,107 @@ describe('deleteTicket', () => {
     const result = deleteTicket(store, 't1')
     expect(result['t2']).toBeDefined()
     expect(Object.keys(result)).toHaveLength(1)
+  })
+})
+
+describe('deleteTicketInSnapshot', () => {
+  it('removes the ticket and records a tombstone', () => {
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(5000)
+    const snapshot: KanbanSnapshot = {
+      tickets: {
+        't1': {
+          id: 't1',
+          title: 'Task',
+          description: '',
+          useSessionMemory: false,
+          status: 'backlog',
+          priority: 'medium',
+          assigneeId: null,
+          assigneeRole: null,
+          ...WORK_DEFAULTS,
+          createdAt: 1000,
+          updatedAt: 1000,
+        },
+      },
+      deleted: {},
+    }
+
+    const result = deleteTicketInSnapshot(snapshot, 't1')
+    expect(result.tickets['t1']).toBeUndefined()
+    expect(result.deleted['t1']).toBe(5000)
+    nowSpy.mockRestore()
+  })
+})
+
+describe('sanitizeSnapshot', () => {
+  it('supports legacy bare-store format', () => {
+    expect(sanitizeSnapshot({ 't1': { id: 't1', title: 'Task' } })).toEqual({
+      tickets: expect.objectContaining({
+        t1: expect.objectContaining({ title: 'Task' }),
+      }),
+      deleted: {},
+    })
+  })
+})
+
+describe('mergeTicketSnapshots', () => {
+  it('keeps a deleted ticket deleted when merging with stale copies', () => {
+    const merged = mergeTicketSnapshots(
+      {
+        tickets: {},
+        deleted: { t1: 3000 },
+      },
+      {
+        tickets: {
+          t1: {
+            id: 't1',
+            title: 'Stale',
+            description: '',
+            useSessionMemory: false,
+            status: 'todo',
+            priority: 'medium',
+            assigneeId: null,
+            assigneeRole: null,
+            ...WORK_DEFAULTS,
+            createdAt: 1000,
+            updatedAt: 2000,
+          },
+        },
+        deleted: {},
+      },
+    )
+
+    expect(merged.tickets.t1).toBeUndefined()
+    expect(merged.deleted.t1).toBe(3000)
+  })
+
+  it('allows a newer ticket update to beat an older deletion', () => {
+    const merged = mergeTicketSnapshots(
+      {
+        tickets: {},
+        deleted: { t1: 2000 },
+      },
+      {
+        tickets: {
+          t1: {
+            id: 't1',
+            title: 'Restored',
+            description: '',
+            useSessionMemory: false,
+            status: 'todo',
+            priority: 'medium',
+            assigneeId: null,
+            assigneeRole: null,
+            ...WORK_DEFAULTS,
+            createdAt: 1000,
+            updatedAt: 3000,
+          },
+        },
+        deleted: {},
+      },
+    )
+
+    expect(merged.tickets.t1?.title).toBe('Restored')
   })
 })
 

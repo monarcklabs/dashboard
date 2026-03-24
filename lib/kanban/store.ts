@@ -2,6 +2,11 @@ import type { KanbanTicket, RelevantFile, TicketStatus, TicketPriority, WorkStat
 import { generateId } from '../id'
 
 export type KanbanStore = Record<string, KanbanTicket>
+export type DeletedTicketMap = Record<string, number>
+export type KanbanSnapshot = {
+  tickets: KanbanStore
+  deleted: DeletedTicketMap
+}
 
 const STORAGE_KEY = 'clawport-kanban'
 
@@ -25,6 +30,20 @@ function sanitizeRelevantFiles(raw: unknown): RelevantFile[] {
       mimeType: typeof f.mimeType === 'string' ? f.mimeType : '',
       url: typeof f.url === 'string' ? f.url : '',
     }))
+}
+
+function sanitizeDeletedMap(raw: unknown): DeletedTicketMap {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const parsed = raw as Record<string, unknown>
+  const deleted: DeletedTicketMap = {}
+
+  for (const [id, deletedAt] of Object.entries(parsed)) {
+    if (typeof deletedAt === 'number' && Number.isFinite(deletedAt) && deletedAt > 0) {
+      deleted[id] = deletedAt
+    }
+  }
+
+  return deleted
 }
 
 /** Validate and sanitize a ticket loaded from localStorage */
@@ -78,6 +97,26 @@ export function sanitizeStore(raw: unknown): KanbanStore {
   return store
 }
 
+export function sanitizeSnapshot(raw: unknown): KanbanSnapshot {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { tickets: {}, deleted: {} }
+  }
+
+  const parsed = raw as Record<string, unknown>
+  const hasSnapshotShape = 'tickets' in parsed || 'deleted' in parsed
+  const tickets = hasSnapshotShape ? sanitizeStore(parsed.tickets) : sanitizeStore(raw)
+  const deleted = hasSnapshotShape ? sanitizeDeletedMap(parsed.deleted) : {}
+
+  for (const [id, deletedAt] of Object.entries(deleted)) {
+    const ticket = tickets[id]
+    if (ticket && deletedAt >= ticket.updatedAt) {
+      delete tickets[id]
+    }
+  }
+
+  return { tickets, deleted }
+}
+
 export function mergeTicketStores(base: KanbanStore, incoming: KanbanStore): KanbanStore {
   const merged: KanbanStore = { ...base }
 
@@ -91,14 +130,45 @@ export function mergeTicketStores(base: KanbanStore, incoming: KanbanStore): Kan
   return merged
 }
 
+export function mergeTicketSnapshots(base: KanbanSnapshot, incoming: KanbanSnapshot): KanbanSnapshot {
+  const deleted: DeletedTicketMap = { ...base.deleted }
+  for (const [id, deletedAt] of Object.entries(incoming.deleted)) {
+    const existing = deleted[id]
+    if (!existing || deletedAt >= existing) {
+      deleted[id] = deletedAt
+    }
+  }
+
+  const tickets = mergeTicketStores(base.tickets, incoming.tickets)
+  for (const [id, deletedAt] of Object.entries(deleted)) {
+    const ticket = tickets[id]
+    if (ticket && deletedAt >= ticket.updatedAt) {
+      delete tickets[id]
+    }
+  }
+
+  return { tickets, deleted }
+}
+
 export function loadTickets(): KanbanStore {
   if (typeof window === 'undefined') return {}
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return {}
-    return sanitizeStore(JSON.parse(raw))
+    return sanitizeSnapshot(JSON.parse(raw)).tickets
   } catch {
     return {}
+  }
+}
+
+export function loadTicketSnapshot(): KanbanSnapshot {
+  if (typeof window === 'undefined') return { tickets: {}, deleted: {} }
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return { tickets: {}, deleted: {} }
+    return sanitizeSnapshot(JSON.parse(raw))
+  } catch {
+    return { tickets: {}, deleted: {} }
   }
 }
 
@@ -106,6 +176,13 @@ export function saveTickets(store: KanbanStore): void {
   if (typeof window === 'undefined') return
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(store))
+  } catch {}
+}
+
+export function saveTicketSnapshot(snapshot: KanbanSnapshot): void {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot))
   } catch {}
 }
 
@@ -160,6 +237,17 @@ export function deleteTicket(store: KanbanStore, id: string): KanbanStore {
   const next = { ...store }
   delete next[id]
   return next
+}
+
+export function deleteTicketInSnapshot(snapshot: KanbanSnapshot, id: string): KanbanSnapshot {
+  const now = Date.now()
+  return {
+    tickets: deleteTicket(snapshot.tickets, id),
+    deleted: {
+      ...snapshot.deleted,
+      [id]: now,
+    },
+  }
 }
 
 export function getTicketsByStatus(
