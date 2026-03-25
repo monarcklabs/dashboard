@@ -5,7 +5,7 @@ import { buildTextPrompt, sendViaOpenClaw } from '@/lib/anthropic'
 import { getOpenAIClient } from '@/lib/openai'
 import { buildKanbanSystemPrompt, sanitizeKanbanTicketContext, type AgentEnvironmentContext } from '@/lib/kanban/chat-prompt'
 import { getIntegrationsSummary, getGoogleWorkspaceConfig } from '@/lib/integrations'
-import { getActiveComposioApps } from '@/lib/composio'
+import { getComposioConnections } from '@/lib/composio'
 import { humanizeKanbanChatError } from '@/lib/kanban/chat-errors'
 import { downloadDriveFile } from '@/lib/google-drive'
 import type OpenAI from 'openai'
@@ -163,10 +163,15 @@ export async function POST(
 
   let environment: AgentEnvironmentContext | null = null
   try {
-    const [summary, composioApps] = await Promise.all([
+    const [summary, composioConnections] = await Promise.all([
       Promise.resolve(getIntegrationsSummary()),
-      getActiveComposioApps(),
+      getComposioConnections(),
     ])
+    const composioApps = [...new Set(
+      composioConnections
+        .filter((connection) => connection.status === 'active')
+        .map((connection) => connection.app)
+    )]
     // Merge Composio apps with GWS service account integrations
     const allServices = [...composioApps]
     if (gwsConfig?.driveEnabled) {
@@ -180,6 +185,7 @@ export async function POST(
         tools: summary.tools,
       },
       composioApps: allServices,
+      composioConnections,
     }
   } catch {
     // Non-fatal — proceed without environment context

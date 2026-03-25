@@ -8,6 +8,9 @@ export interface ComposioConnection {
   id: string
   app: string
   status: 'active' | 'expired' | 'failed' | 'initiated' | 'inactive' | 'initializing'
+  authConfigId: string | null
+  userId: string | null
+  accountHint: string | null
 }
 
 /**
@@ -57,7 +60,10 @@ export async function getComposioConnections(): Promise<ComposioConnection[]> {
       items?: Array<{
         id: string
         toolkit?: { slug: string }
+        auth_config?: { id?: string }
+        user_id?: string
         status: string
+        state?: { val?: Record<string, unknown> }
       }>
     }
 
@@ -67,6 +73,9 @@ export async function getComposioConnections(): Promise<ComposioConnection[]> {
       id: item.id,
       app: item.toolkit?.slug || 'unknown',
       status: item.status.toLowerCase() as ComposioConnection['status'],
+      authConfigId: typeof item.auth_config?.id === 'string' ? item.auth_config.id : null,
+      userId: typeof item.user_id === 'string' ? item.user_id : null,
+      accountHint: extractAccountHint(item.state?.val),
     }))
   } catch {
     return []
@@ -84,4 +93,29 @@ export async function getActiveComposioApps(): Promise<string[]> {
       .filter((c) => c.status === 'active')
       .map((c) => c.app)
   )]
+}
+
+function extractAccountHint(value: unknown): string | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+
+  const record = value as Record<string, unknown>
+  const candidates = [
+    record.shop,
+    record.account_url,
+    record.base_url,
+    record.domain,
+    record.subdomain,
+    record.site_name,
+    record.instanceName,
+    record.account_id,
+  ]
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string') {
+      const trimmed = candidate.trim()
+      if (trimmed) return trimmed
+    }
+  }
+
+  return null
 }

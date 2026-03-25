@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildKanbanSystemPrompt, sanitizeKanbanTicketContext } from './chat-prompt'
+import { buildEnvironmentBlock, buildKanbanSystemPrompt, sanitizeKanbanTicketContext } from './chat-prompt'
 
 describe('sanitizeKanbanTicketContext', () => {
   it('returns null for non-object ticket values', () => {
@@ -107,5 +107,29 @@ describe('buildKanbanSystemPrompt', () => {
 
     expect(prompt).toContain('Mission statement: Become the most trusted advisor in AI governance.')
     expect(prompt).toContain('align recommendations, priorities, and trade-offs')
+  })
+
+  it('includes detailed Composio connection references in the environment block', () => {
+    const block = buildEnvironmentBlock({
+      tools: [],
+      integrations: { channels: [], tools: [] },
+      composioApps: ['shopify'],
+      composioConnections: [
+        {
+          id: 'con_shopify_123',
+          app: 'shopify',
+          status: 'active',
+          authConfigId: 'ac_8V2E7xvePlWX',
+          userId: null,
+          accountHint: 'pinchy-store.myshopify.com',
+        },
+      ],
+    })
+
+    expect(block).toContain('Composio connected services: shopify')
+    expect(block).toContain('connected_account_id: con_shopify_123')
+    expect(block).toContain('auth_config_id: ac_8V2E7xvePlWX')
+    expect(block).toContain('account: pinchy-store.myshopify.com')
+    expect(block).toContain('Do not ask them to resend credentials')
   })
 })

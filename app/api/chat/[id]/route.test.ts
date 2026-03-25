@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   createCompletion: vi.fn(),
   getAgent: vi.fn(),
+  getIntegrationsSummary: vi.fn(),
+  getGoogleWorkspaceConfig: vi.fn(),
+  getComposioConnections: vi.fn(),
   sendViaOpenClaw: vi.fn(),
 }))
 
@@ -21,6 +24,15 @@ vi.mock('openai', () => {
 
 vi.mock('@/lib/agents', () => ({
   getAgent: mocks.getAgent,
+}))
+
+vi.mock('@/lib/integrations', () => ({
+  getIntegrationsSummary: mocks.getIntegrationsSummary,
+  getGoogleWorkspaceConfig: mocks.getGoogleWorkspaceConfig,
+}))
+
+vi.mock('@/lib/composio', () => ({
+  getComposioConnections: mocks.getComposioConnections,
 }))
 
 vi.mock('@/lib/anthropic', async () => {
@@ -75,7 +87,20 @@ describe('POST /api/chat/[id]', () => {
       title: 'Ecommerce Lead',
       soul: 'Focus on ecommerce analytics.',
       model: 'claude-sonnet-4-6',
+      tools: [],
     })
+    mocks.getIntegrationsSummary.mockReturnValue({ channels: [], tools: [] })
+    mocks.getGoogleWorkspaceConfig.mockReturnValue(null)
+    mocks.getComposioConnections.mockResolvedValue([
+      {
+        id: 'con_shopify_123',
+        app: 'shopify',
+        status: 'active',
+        authConfigId: 'ac_8V2E7xvePlWX',
+        userId: null,
+        accountHint: 'pinchy-store.myshopify.com',
+      },
+    ])
     mocks.sendViaOpenClaw.mockResolvedValue('Top seller appears to be the black hoodie.')
   })
 
@@ -96,6 +121,8 @@ describe('POST /api/chat/[id]', () => {
       timeoutMs: 120000,
     })
     expect(mocks.sendViaOpenClaw.mock.calls[0][0].message).toContain('Shopify integration')
+    expect(mocks.sendViaOpenClaw.mock.calls[0][0].message).toContain('auth_config_id: ac_8V2E7xvePlWX')
+    expect(mocks.sendViaOpenClaw.mock.calls[0][0].message).toContain('pinchy-store.myshopify.com')
     expect(mocks.sendViaOpenClaw.mock.calls[0][0].sessionKey).toMatch(/^chat:ecommerce-lead:/)
   })
 

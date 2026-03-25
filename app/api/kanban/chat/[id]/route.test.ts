@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   getAgent: vi.fn(),
   getIntegrationsSummary: vi.fn(),
   getGoogleWorkspaceConfig: vi.fn(),
-  getActiveComposioApps: vi.fn(),
+  getComposioConnections: vi.fn(),
   sendViaOpenClaw: vi.fn(),
   downloadDriveFile: vi.fn(),
 }))
@@ -33,7 +33,7 @@ vi.mock('@/lib/integrations', () => ({
 }))
 
 vi.mock('@/lib/composio', () => ({
-  getActiveComposioApps: mocks.getActiveComposioApps,
+  getComposioConnections: mocks.getComposioConnections,
 }))
 
 vi.mock('@/lib/anthropic', async () => {
@@ -102,7 +102,7 @@ describe('POST /api/kanban/chat/[id]', () => {
     })
     mocks.getIntegrationsSummary.mockReturnValue({ channels: [], tools: [] })
     mocks.getGoogleWorkspaceConfig.mockReturnValue(null)
-    mocks.getActiveComposioApps.mockResolvedValue([])
+    mocks.getComposioConnections.mockResolvedValue([])
     mocks.downloadDriveFile.mockResolvedValue(null)
     mocks.sendViaOpenClaw.mockResolvedValue('Recovered through async fallback.')
   })

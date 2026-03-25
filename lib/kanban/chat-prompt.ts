@@ -1,4 +1,5 @@
 import type { Agent, IntegrationItem } from '@/lib/types'
+import type { ComposioConnection } from '@/lib/composio'
 
 const MAX_TITLE = 500
 const MAX_DESC = 5000
@@ -78,9 +79,10 @@ export interface AgentEnvironmentContext {
   }
   /** Live Composio connected services (e.g. ['gmail', 'google_sheets', 'slack']) */
   composioApps?: string[]
+  composioConnections?: ComposioConnection[]
 }
 
-function buildEnvironmentBlock(env: AgentEnvironmentContext | null): string {
+export function buildEnvironmentBlock(env: AgentEnvironmentContext | null): string {
   if (!env) return ''
 
   const parts: string[] = []
@@ -113,9 +115,24 @@ function buildEnvironmentBlock(env: AgentEnvironmentContext | null): string {
     parts.push(`Composio connected services: ${env.composioApps.join(', ')}`)
   }
 
+  const activeComposioConnections = (env.composioConnections || [])
+    .filter((connection) => connection.status === 'active')
+    .map((connection) => {
+      const details = [
+        `connected_account_id: ${connection.id}`,
+        connection.authConfigId ? `auth_config_id: ${connection.authConfigId}` : null,
+        connection.accountHint ? `account: ${connection.accountHint}` : null,
+      ].filter(Boolean).join(', ')
+      return `${connection.app}${details ? ` (${details})` : ''}`
+    })
+
+  if (activeComposioConnections.length > 0) {
+    parts.push(`Composio connected accounts: ${activeComposioConnections.join('; ')}`)
+  }
+
   if (parts.length === 0) return ''
 
-  return `\n\nEnvironment:\n${parts.join('\n')}\nThese tools and integrations are already configured and available. Do not ask the user whether they are set up -- just use them.`
+  return `\n\nEnvironment:\n${parts.join('\n')}\nThese tools and integrations are already configured and available. Do not ask the user whether they are set up -- just use them.\nIf the user mentions a listed Composio connected account ID or auth config ID, treat it as an existing configured integration. Do not ask them to resend credentials or a session URL just to confirm it exists.`
 }
 
 export function buildKanbanSystemPrompt(

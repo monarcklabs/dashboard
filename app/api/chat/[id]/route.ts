@@ -4,6 +4,9 @@ import { getAgent } from '@/lib/agents'
 import { validateChatMessages } from '@/lib/validation'
 import { hasImageContent, extractImageAttachments, buildTextPrompt, sendViaOpenClaw } from '@/lib/anthropic'
 import { getOpenAIClient } from '@/lib/openai'
+import { buildEnvironmentBlock, type AgentEnvironmentContext } from '@/lib/kanban/chat-prompt'
+import { getComposioConnections } from '@/lib/composio'
+import { getGoogleWorkspaceConfig, getIntegrationsSummary } from '@/lib/integrations'
 import type OpenAI from 'openai'
 
 const ASYNC_FALLBACK_TIMEOUT_MS = 120_000
@@ -137,10 +140,40 @@ export async function POST(
   const rawBody = body as Record<string, unknown>
   const operatorName = typeof rawBody.operatorName === 'string' ? rawBody.operatorName : 'Operator'
   const missionStatement = sanitizeMissionStatement(rawBody.missionStatement)
+  const gwsConfig = getGoogleWorkspaceConfig()
+
+  let environment: AgentEnvironmentContext | null = null
+  try {
+    const [summary, composioConnections] = await Promise.all([
+      Promise.resolve(getIntegrationsSummary()),
+      getComposioConnections(),
+    ])
+    const composioApps = [...new Set(
+      composioConnections
+        .filter((connection) => connection.status === 'active')
+        .map((connection) => connection.app)
+    )]
+    const allServices = [...composioApps]
+    if (gwsConfig?.driveEnabled) {
+      if (!allServices.includes('googledrive')) allServices.push('googledrive')
+      if (!allServices.includes('googledocs')) allServices.push('googledocs')
+    }
+    environment = {
+      tools: Array.isArray(agent.tools) ? agent.tools : [],
+      integrations: {
+        channels: summary.channels,
+        tools: summary.tools,
+      },
+      composioApps: allServices,
+      composioConnections,
+    }
+  } catch {
+    // Non-fatal. Proceed without environment context.
+  }
 
   const systemPrompt = agent.soul
-    ? `${agent.soul}\n\nYou are speaking directly with ${operatorName}, your operator. Stay fully in character. Be concise — this is a live chat. 2-4 sentences unless detail is asked for. No em dashes.${missionStatement ? `\n\nMission statement:\n${missionStatement}\nUse it to keep recommendations and decisions aligned with the user's goals.` : ''}`
-    : `You are ${agent.name}, ${agent.title}. Respond in character. Be concise. No em dashes.${missionStatement ? `\n\nMission statement:\n${missionStatement}\nUse it to keep recommendations and decisions aligned with the user's goals.` : ''}`
+    ? `${agent.soul}\n\nYou are speaking directly with ${operatorName}, your operator. Stay fully in character. Be concise — this is a live chat. 2-4 sentences unless detail is asked for. No em dashes.${missionStatement ? `\n\nMission statement:\n${missionStatement}\nUse it to keep recommendations and decisions aligned with the user's goals.` : ''}${buildEnvironmentBlock(environment)}`
+    : `You are ${agent.name}, ${agent.title}. Respond in character. Be concise. No em dashes.${missionStatement ? `\n\nMission statement:\n${missionStatement}\nUse it to keep recommendations and decisions aligned with the user's goals.` : ''}${buildEnvironmentBlock(environment)}`
 
   const completionMessages = [
     { role: 'system' as const, content: systemPrompt },
