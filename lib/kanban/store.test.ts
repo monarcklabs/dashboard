@@ -11,6 +11,7 @@ import {
   deleteTicketInSnapshot,
   getTicketsByStatus,
   mergeTicketSnapshots,
+  reconcileRemoteSnapshot,
   sanitizeSnapshot,
   type KanbanSnapshot,
   type KanbanStore,
@@ -351,6 +352,40 @@ describe('mergeTicketSnapshots', () => {
     )
 
     expect(merged.tickets.t1?.title).toBe('Restored')
+  })
+})
+
+describe('reconcileRemoteSnapshot', () => {
+  it('prefers remote tickets while preserving local deletion tombstones', () => {
+    const reconciled = reconcileRemoteSnapshot(
+      {
+        tickets: {},
+        deleted: {},
+      },
+      {
+        tickets: {
+          stale: {
+            id: 'stale',
+            title: 'Stale local ticket',
+            description: '',
+            useSessionMemory: false,
+            status: 'todo',
+            priority: 'medium',
+            assigneeId: null,
+            assigneeRole: null,
+            ...WORK_DEFAULTS,
+            createdAt: 1000,
+            updatedAt: 2000,
+          },
+        },
+        deleted: { removed: 3000 },
+      },
+    )
+
+    expect(reconciled).toEqual({
+      tickets: {},
+      deleted: { removed: 3000 },
+    })
   })
 })
 

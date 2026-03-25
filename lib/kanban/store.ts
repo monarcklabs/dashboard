@@ -150,6 +150,13 @@ export function mergeTicketSnapshots(base: KanbanSnapshot, incoming: KanbanSnaps
   return { tickets, deleted }
 }
 
+export function reconcileRemoteSnapshot(remote: KanbanSnapshot, local: KanbanSnapshot): KanbanSnapshot {
+  return mergeTicketSnapshots(remote, {
+    tickets: {},
+    deleted: local.deleted,
+  })
+}
+
 export function loadTickets(): KanbanStore {
   if (typeof window === 'undefined') return {}
   try {

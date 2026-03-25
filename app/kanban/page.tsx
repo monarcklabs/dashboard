@@ -13,6 +13,7 @@ import {
   moveTicket,
   deleteTicketInSnapshot,
   mergeTicketSnapshots,
+  reconcileRemoteSnapshot,
   type KanbanSnapshot,
   type KanbanStore,
 } from '@/lib/kanban/store'
@@ -95,9 +96,8 @@ export default function KanbanPage() {
         if (!r.ok) throw new Error('Failed to fetch kanban tickets')
         return r.json() as Promise<KanbanSnapshot>
       })
-      .catch(() => ({ tickets: {}, deleted: {} } as KanbanSnapshot))
       .then(async (remoteSnapshot) => {
-        const merged = mergeTicketSnapshots(remoteSnapshot, localSnapshot)
+        const merged = reconcileRemoteSnapshot(remoteSnapshot, localSnapshot)
         persistTicketSnapshot(merged)
         setHydrated(true)
 
@@ -117,7 +117,12 @@ export default function KanbanPage() {
           }).catch(() => {})
         }
       })
-      .catch((e) => setTicketError(e instanceof Error ? e.message : 'Failed to load kanban tickets'))
+      .catch((e) => {
+        const fallback = mergeTicketSnapshots({ tickets: {}, deleted: {} }, localSnapshot)
+        persistTicketSnapshot(fallback)
+        setHydrated(true)
+        setTicketError(e instanceof Error ? e.message : 'Failed to load kanban tickets')
+      })
       .finally(() => setLoading(false))
   }, [persistTicketSnapshot])
 
@@ -145,7 +150,7 @@ export default function KanbanPage() {
         .then((remote: KanbanSnapshot | null) => {
           if (!remote) return
           persistTicketSnapshot((prev) => {
-            const merged = mergeTicketSnapshots(remote, prev)
+            const merged = reconcileRemoteSnapshot(remote, prev)
             if (JSON.stringify(merged) === JSON.stringify(prev)) return prev
             return merged
           })
