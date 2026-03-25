@@ -16,6 +16,21 @@ interface ParsedLogContext {
   message: string
 }
 
+function prettifyIdentifier(value: string): string {
+  return value
+    .trim()
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
+function resolveAgentLabel(raw: string, agents: Agent[]): string {
+  const normalized = raw.trim().toLowerCase()
+  const found = agents.find(
+    (agent) => agent.id.toLowerCase() === normalized || agent.name.toLowerCase() === normalized,
+  )
+  return found?.name || prettifyIdentifier(raw)
+}
+
 /**
  * Try to match a log message to a known agent.
  * Looks for patterns like "agent:vera:" or the agent name/id in the message.
@@ -97,6 +112,9 @@ function shouldIgnoreSubsystemNoise(line: LiveLogLine, subsystem: string | null,
   // Always surface errors
   if (line.level === 'error') return false
 
+  // Keep warnings we explicitly translate into client-facing language.
+  if (humanizeSystemLog(subsystem, message) !== message) return false
+
   // Filter out manifest/plugins noise (OpenAI-compatible provider, dashboard links)
   if (subsystem === 'plugins') return true
   if (/^\[plugins\]|\[manifest\]/.test(message)) return true
@@ -148,6 +166,79 @@ function humanizeSystemLog(subsystem: string | null, message: string): string {
   return message
 }
 
+function humanizeAgentLog(message: string, agents: Agent[]): string | null {
+  const trimmed = message.trim()
+
+  const patterns: Array<[RegExp, (...groups: string[]) => string]> = [
+    [
+      /(?:delegating|delegated|handoff(?:ing)?|handed off)\s+(?:"([^"]+)"|ticket\s+"([^"]+)"|ticket\s+([^.]+?)|work)\s+(?:to|for)\s+(?:sub-?agent\s+)?([a-z0-9_-]+)/i,
+      (quotedTitle, quotedTicket, plainTicket, rawAgent) => {
+        const title = quotedTitle || quotedTicket || plainTicket
+        const assignee = resolveAgentLabel(rawAgent, agents)
+        return title
+          ? `Delegated "${title.trim()}" to ${assignee}.`
+          : `Delegated work to ${assignee}.`
+      },
+    ],
+    [
+      /(?:sub-?agent|agent)\s+([a-z0-9_-]+)\s+(?:started|is starting)\s+(?:work(?:ing)?\s+on\s+)?(?:"([^"]+)"|ticket\s+"([^"]+)"|ticket\s+([^.]+))?/i,
+      (rawAgent, quotedTitle, quotedTicket, plainTicket) => {
+        const agent = resolveAgentLabel(rawAgent, agents)
+        const title = quotedTitle || quotedTicket || plainTicket
+        return title
+          ? `${agent} started "${title.trim()}".`
+          : `${agent} started work.`
+      },
+    ],
+    [
+      /(?:sub-?agent|agent)\s+([a-z0-9_-]+)\s+(?:is working on|working on|processing|researching|reviewing|drafting)\s+(?:"([^"]+)"|ticket\s+"([^"]+)"|ticket\s+([^.]+))?/i,
+      (rawAgent, quotedTitle, quotedTicket, plainTicket) => {
+        const agent = resolveAgentLabel(rawAgent, agents)
+        const title = quotedTitle || quotedTicket || plainTicket
+        return title
+          ? `${agent} is working on "${title.trim()}".`
+          : `${agent} is actively working.`
+      },
+    ],
+    [
+      /(?:sub-?agent|agent)\s+([a-z0-9_-]+)\s+(?:completed|finished|wrapped up)\s+(?:"([^"]+)"|ticket\s+"([^"]+)"|ticket\s+([^.]+))?/i,
+      (rawAgent, quotedTitle, quotedTicket, plainTicket) => {
+        const agent = resolveAgentLabel(rawAgent, agents)
+        const title = quotedTitle || quotedTicket || plainTicket
+        return title
+          ? `${agent} completed "${title.trim()}".`
+          : `${agent} completed work.`
+      },
+    ],
+    [
+      /(?:sub-?agent|agent)\s+([a-z0-9_-]+)\s+(?:failed|hit an error|errored)\s+(?:while\s+working\s+on\s+)?(?:"([^"]+)"|ticket\s+"([^"]+)"|ticket\s+([^.]+))?/i,
+      (rawAgent, quotedTitle, quotedTicket, plainTicket) => {
+        const agent = resolveAgentLabel(rawAgent, agents)
+        const title = quotedTitle || quotedTicket || plainTicket
+        return title
+          ? `${agent} hit an error on "${title.trim()}".`
+          : `${agent} hit an error.`
+      },
+    ],
+    [
+      /(?:waiting|needs)\s+(?:for\s+)?(?:input|review|approval|clarification)(?:\s+on\s+(?:"([^"]+)"|ticket\s+"([^"]+)"|ticket\s+([^.]+)))?/i,
+      (quotedTitle, quotedTicket, plainTicket) => {
+        const title = quotedTitle || quotedTicket || plainTicket
+        return title
+          ? `Waiting on input for "${title.trim()}".`
+          : 'Waiting on client input.'
+      },
+    ],
+  ]
+
+  for (const [pattern, formatter] of patterns) {
+    const match = trimmed.match(pattern)
+    if (match) return formatter(...match.slice(1))
+  }
+
+  return null
+}
+
 /**
  * Transform a raw LiveLogLine message into a short, human-readable summary.
  * Strips JSON noise, extracts the meaningful content.
@@ -197,12 +288,13 @@ export function logLineToEntry(line: LiveLogLine, agents: Agent[], index: number
   }
 
   const agent = extractAgentFromLog(context.message, agents)
+  const summary = humanizeAgentLog(context.message, agents) || formatLogMessage(line)
   return {
     id: `log-${line.time}-${index}`,
     agentId: agent?.id || null,
     agentName: agent?.name || 'System',
     agentColor: agent?.color || '#6b7280',
-    summary: formatLogMessage(line),
+    summary,
     timestamp: new Date(line.time).getTime() || Date.now(),
     source: 'log',
   }

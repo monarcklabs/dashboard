@@ -84,13 +84,6 @@ export function sanitizeStore(raw: unknown): KanbanStore {
     const ticket = sanitizeTicket(id, parsed[id])
     if (!ticket) continue
 
-    if (ticket.workState === 'working' || ticket.workState === 'starting') {
-      ticket.status = 'todo'
-      ticket.workState = 'idle'
-      ticket.workStartedAt = null
-      ticket.workError = null
-    }
-
     store[id] = ticket
   }
 

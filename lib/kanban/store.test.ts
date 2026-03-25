@@ -292,6 +292,38 @@ describe('sanitizeSnapshot', () => {
       deleted: {},
     })
   })
+
+  it('preserves active work state during hydration', () => {
+    const snapshot = sanitizeSnapshot({
+      tickets: {
+        t1: {
+          id: 't1',
+          title: 'Task',
+          description: '',
+          useSessionMemory: false,
+          relevantFiles: [],
+          status: 'in-progress',
+          priority: 'medium',
+          assigneeId: 'agent-1',
+          assigneeRole: null,
+          projectId: null,
+          workState: 'working',
+          workStartedAt: 2000,
+          workError: null,
+          workResult: null,
+          createdAt: 1000,
+          updatedAt: 2000,
+        },
+      },
+      deleted: {},
+    })
+
+    expect(snapshot.tickets.t1).toMatchObject({
+      status: 'in-progress',
+      workState: 'working',
+      workStartedAt: 2000,
+    })
+  })
 })
 
 describe('mergeTicketSnapshots', () => {

@@ -317,7 +317,7 @@ export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
               {value.length} file{value.length !== 1 ? 's' : ''} attached
             </span>
           ) : (
-            <span>Attach files from Drive</span>
+            <span>Attach files</span>
           )}
         </button>
 
@@ -477,7 +477,7 @@ export function DriveFilePicker({ value, onChange }: DriveFilePickerProps) {
                     Click or drop files here
                   </span>
                   <span style={{ fontSize: 'var(--text-caption2)', color: 'var(--text-tertiary)' }}>
-                    Any file type supported
+                    Upload directly from this device
                   </span>
                 </div>
               </div>

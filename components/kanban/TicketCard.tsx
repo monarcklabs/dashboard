@@ -219,7 +219,7 @@ export function TicketCard({ ticket, agent, onClick, isWorking }: TicketCardProp
       </div>
 
       {/* Work state indicators */}
-      {(ticket.workState === 'working' || isWorking) && (
+      {((ticket.workState === 'starting' || ticket.workState === 'working') || isWorking) && (
         <div
           style={{
             display: 'flex',
@@ -238,7 +238,7 @@ export function TicketCard({ ticket, agent, onClick, isWorking }: TicketCardProp
             background: 'var(--system-orange)',
             animation: 'pulse 2s ease-in-out infinite',
           }} />
-          Working...
+          {ticket.workState === 'starting' && !isWorking ? 'Starting...' : 'Working...'}
         </div>
       )}
 

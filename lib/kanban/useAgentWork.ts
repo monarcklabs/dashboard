@@ -79,8 +79,13 @@ export function useAgentWork({ tickets, onUpdateTicket }: UseAgentWorkOptions) {
     const locked = await tryAcquireLock(id)
     if (!locked) {
       activeWork.current.delete(id)
-      // Another browser is working on it — revert to idle so we don't block it
-      onUpdateTicket(id, { workState: 'idle' })
+      // Another browser already claimed this ticket, so keep the card in a working state locally.
+      onUpdateTicket(id, {
+        status: 'in-progress',
+        workState: 'working',
+        workStartedAt: ticket.workStartedAt ?? Date.now(),
+        workError: null,
+      })
       return
     }
 

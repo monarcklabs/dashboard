@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { Plus } from 'lucide-react'
 import type { Agent } from '@/lib/types'
 import type { TicketPriority, TeamRole, RelevantFile, Project } from '@/lib/kanban/types'
@@ -64,14 +64,6 @@ export function CreateTicketModal({
   onSubmit,
 }: CreateTicketModalProps) {
   const [form, setForm] = useState({ ...initialState, projectId: defaultProjectId ?? '' })
-  const [driveEnabled, setDriveEnabled] = useState(false)
-
-  useEffect(() => {
-    fetch('/api/export/google-doc')
-      .then((res) => res.json())
-      .then((data) => setDriveEnabled(data.enabled === true))
-      .catch(() => {})
-  }, [])
 
   const resetForm = useCallback(() => {
     setForm({ ...initialState, projectId: defaultProjectId ?? '' })
@@ -199,13 +191,10 @@ export function CreateTicketModal({
             />
           </div>
 
-          {/* Relevant Files (Google Drive) */}
-          {driveEnabled && (
-            <DriveFilePicker
-              value={form.relevantFiles}
-              onChange={(files) => setForm((f) => ({ ...f, relevantFiles: files }))}
-            />
-          )}
+          <DriveFilePicker
+            value={form.relevantFiles}
+            onChange={(files) => setForm((f) => ({ ...f, relevantFiles: files }))}
+          />
 
           {/* Session memory */}
           <label

@@ -213,6 +213,51 @@ describe('logLineToEntry', () => {
     expect(entry?.summary).toBe('Gateway saw proxy headers from an untrusted address.')
     expect(entry?.agentName).toBe('System')
   })
+
+  it('humanizes delegation to a sub-agent', () => {
+    const line: LiveLogLine = {
+      type: 'log',
+      time: '2026-03-22T12:00:00Z',
+      level: 'info',
+      message: 'agent:vera: delegated ticket "Launch brief" to sub-agent scout',
+    }
+    const entry = logLineToEntry(line, agents, 0)
+    expect(entry?.agentName).toBe('VERA')
+    expect(entry?.summary).toBe('Delegated "Launch brief" to Scout.')
+  })
+
+  it('humanizes sub-agent progress in client language', () => {
+    const line: LiveLogLine = {
+      type: 'log',
+      time: '2026-03-22T12:00:00Z',
+      level: 'info',
+      message: 'agent:vera: sub-agent scout working on ticket "Launch brief"',
+    }
+    const entry = logLineToEntry(line, agents, 0)
+    expect(entry?.summary).toBe('Scout is working on "Launch brief".')
+  })
+
+  it('humanizes sub-agent completion', () => {
+    const line: LiveLogLine = {
+      type: 'log',
+      time: '2026-03-22T12:00:00Z',
+      level: 'info',
+      message: 'agent:vera: sub-agent scout completed ticket "Launch brief"',
+    }
+    const entry = logLineToEntry(line, agents, 0)
+    expect(entry?.summary).toBe('Scout completed "Launch brief".')
+  })
+
+  it('humanizes client-input blockers', () => {
+    const line: LiveLogLine = {
+      type: 'log',
+      time: '2026-03-22T12:00:00Z',
+      level: 'info',
+      message: 'agent:vera: waiting for input on ticket "Launch brief"',
+    }
+    const entry = logLineToEntry(line, agents, 0)
+    expect(entry?.summary).toBe('Waiting on input for "Launch brief".')
+  })
 })
 
 describe('diffTicketEvents', () => {
