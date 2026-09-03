@@ -1,3 +1,6 @@
+> [!WARNING]
+> **Retired and unsupported.** This repository contains the historical ClawPort UI and is not the Monarck dashboard used by current deployments. Do not use it as a reference for current product behavior, architecture, or deployment work. The supported dashboard lives at [`monarcklabs/basic/dashboard`](https://github.com/monarcklabs/basic/tree/main/dashboard).
+
 <div align="center">
 
 <img src="https://raw.githubusercontent.com/JohnRiceML/clawport-ui/main/clawport-logo.png" alt="ClawPort" width="160" />
